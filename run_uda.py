@@ -18,9 +18,6 @@ from adapt import WRR
 from models.conv import ConvNet, ConvNet2, LeNet, SmallCNN
 from models.mlp import MultiLayerPerceptron as MLP
 
-# Necessary in mac osx to be able close figures in emacs
-matplotlib.use(backend="QtAgg", force=True)
-
 
 def reset_all(seed):
     # Python & NumPy
@@ -47,42 +44,44 @@ class EuclideanLoss(nn.Module):
         return losses
 
 
-def get_methods(model, loss_fun, fabric):
+def get_methods(config, model, loss_fun, fabric):
     # Prepare adaptation methods
     methods = []
-    methods.append(
-        WRR(
-            fabric,
-            model,
-            loss_fun,
-            learning_rate=1e-4,
-            weight=False,
-            p=1,
-            scale=1.0,
-            reg=1e-2,
-            debug=True)
-    )
-    methods.append(
-        WRR(
-            fabric,
-            model,
-            loss_fun,
-            learning_rate=1e-4,
-            weight=True,
-            p=1,
-            scale=1.0,
-            reg=1e-2,
-            debug=True))
+    if 'wrr' in config['algs']:
+        methods.append(
+            WRR(
+                fabric,
+                model,
+                loss_fun,
+                learning_rate=1e-4,
+                weight=False,
+                p=1,
+                scale=1.0,
+                reg=1e-2,
+                debug=False)
+        )
+    elif 'weighted_wrr' in config['algs']:
+        methods.append(
+            WRR(
+                fabric,
+                model,
+                loss_fun,
+                learning_rate=1e-4,
+                weight=True,
+                p=1,
+                scale=1.0,
+                reg=1e-2,
+                debug=True))
     return methods
 
 
-def run_uda(methods, model, scenario, loss_fun, num_epochs, fabric):
+def run_uda(config, methods, model, scenario, loss_fun, num_epochs, fabric):
     # Run adaptation
     for method in methods:
         print("===============================")
         print(f"Method {method.name}")
         reset_all(seed=1)
-        for epoch in range(num_epochs):
+        for epoch in range(config['num_epochs']):
             batch_idx = 0
             print(f"Epoch {epoch+1}")
             for (X_train, y_train), (X_shift, y_shift) in zip(scenario.source_dataloader, scenario.target_dataloader):
@@ -99,14 +98,23 @@ def run_uda(methods, model, scenario, loss_fun, num_epochs, fabric):
         model.restore_params()
 
 
-def init_scenario(dataloader_options, fabric):
-    # scenario = shifts.MNIST_to_USPS(dataloader_options, use_sampler=True, class_balanced=False)
-    # scenario = shifts.USPS_to_MNIST(dataloader_options, use_sampler=True)
-    scenario = shifts.MNIST_to_MNIST_M(dataloader_options, preprocess=False)
-    # scenario = shifts.SVHN_to_MNIST(dataloader_options, class_balanced=False)
-    # scenario = shifts.CIFAR_CORRUPT(dataloader_options, corruptions=["fog", "frost", "snow"])
-    # scenario = shifts.PORTRAITS(dataloader_options, size=(32,32), train_ratio=0.8)
-    # scenario = shifts.OFFICEHOME(dataloader_options, size=(224,224))
+def init_scenario(config, fabric):
+    if config['scenario'] == 'MNIST_to_USPS':
+        scenario = shifts.MNIST_to_USPS(dataloader_options, use_sampler=True, class_balanced=config['class_balanced'])
+    elif config['scenario'] == 'USPS_to_MNIST':
+        scenario = shifts.USPS_to_MNIST(dataloader_options, use_sampler=True)
+    elif config['scenario'] == 'MNIST_to_MNIST_M':
+        scenario = shifts.MNIST_to_MNIST_M(dataloader_options, preprocess=False)
+    elif config['scenario'] == 'SVHN_to_MNIST':
+        scenario = shifts.SVHN_to_MNIST(dataloader_options, class_balanced=config['class_balanced'])
+    elif config['scenario'] == 'CIFAR10C':
+        scenario = shifts.CIFAR_CORRUPT(dataloader_options, corruptions=["fog", "frost", "snow"])
+    elif config['scenario'] == 'PORTRAITS':
+        scenario = shifts.PORTRAITS(dataloader_options, size=(32,32), train_ratio=0.8)
+    elif config['scenario'] == 'OFFICEHOME':
+        scenario = shifts.OFFICEHOME(dataloader_options, size=(224,224))
+    else:
+        raise Exception('Unknown scenario')
     scenario.source_dataloader = fabric.setup_dataloaders(scenario.source_dataloader)
     scenario.target_dataloader = fabric.setup_dataloaders(scenario.target_dataloader)
     scenario.source_test_dataloader = fabric.setup_dataloaders(scenario.source_test_dataloader)
@@ -114,22 +122,33 @@ def init_scenario(dataloader_options, fabric):
     return scenario
 
 
-def init_model(scenario):
-    # model = MLP(layer_sizes=[scenario.input_size, 200, 100, scenario.num_classes], f_nonlinear=nn.ReLU())
-    # model = ConvNet(num_classes=scenario.num_classes)
-    # model = ConvNet2(num_classes=scenario.num_classes)
-    # model = LeNet(num_classes=scenario.num_classes)
-    # model = SmallCNN(num_classes=scenario.num_classes)
-    # load_model(model, scenario)
-    model = init_resnet(scenario.num_classes)
+def init_model(config, scenario):
+    if config['model'] == 'MLP':
+        model = MLP(layer_sizes=[scenario.input_size, 200, 100, scenario.num_classes], f_nonlinear=nn.ReLU())
+    elif config['model'] == 'ConvNet':
+        model = ConvNet(num_classes=scenario.num_classes)
+    elif config['model'] == 'ConvNet2':
+        model = ConvNet2(num_classes=scenario.num_classes)
+    elif config['model'] == 'LeNet':
+        model = LeNet(num_classes=scenario.num_classes)
+    elif config['model'] == 'SmallCNN':
+        model = SmallCNN(num_classes=scenario.num_classes)
+    elif config['model'] == 'ResNet':
+        model = init_resnet(config['resnet_size'], scenario.num_classes)
     return model
 
 
-def init_resnet(num_classes):
-    model = torchvision.models.resnet18(weights="IMAGENET1K_V1")
+def init_resnet(size, num_classes):
+    if size == 18:
+        model = torchvision.models.resnet18(weights="IMAGENET1K_V1")
+        model.name = "RESNET18"
+    elif size == 50:
+        model = torchvision.models.resnet50(weights="IMAGENET1K_V1")
+        model.name = "RESNET50"
+    else:
+        raise Exception('Resnet size not allowed!')
     model.num_classes = num_classes
-    model.fc = nn.Linear(model.fc.in_features, num_classes)  # for OfficeHomeDataset
-    model.name = "RESNET18"
+    model.fc = nn.Linear(model.fc.in_features, num_classes)
 
     @torch.no_grad()
     def save_params(model):
@@ -145,20 +164,18 @@ def init_resnet(num_classes):
     return model
 
 
-def run_uda_experiments(fabric, num_epochs, pretrain=False):
-    loss_fun = EuclideanLoss()
-    # loss_fun = nn.CrossEntropyLoss()
-    dataloader_options = {"batch_size": 64, "shuffle": False, "drop_last": True}
-    scenario = init_scenario(dataloader_options, fabric)
-    model = init_model(scenario)
-    if pretrain is True:
-        model = utils.train_model_on_source(model, loss_fun, scenario, num_epochs=5, fabric=fabric)
+def run_uda_experiments(fabric, config):
+    loss_fun = config['loss']
+    scenario = init_scenario(config, fabric)
+    model = init_model(config, scenario)
+    if config['pretrain'] is True:
+        model = utils.train_model_on_source(model, loss_fun, scenario, num_epochs=config['num_pretrain_epochs'], fabric=fabric)
     else:
         fabric.setup(model)
     model.save_params()
     # Report initial performance of a loaded source-trained model
     utils.report_acc(scenario, model, loss_fun)
-    methods = get_methods(model, loss_fun, fabric)
+    methods = get_methods(config, model, loss_fun, fabric)
     run_uda(methods, model, scenario, loss_fun, num_epochs, fabric)
 
 
@@ -194,10 +211,38 @@ def check_shared_support():
 
 
 if __name__ == "__main__":
-    fabric = Fabric(accelerator="auto", devices="auto", strategy="auto")
+    fabric = Fabric(accelerator="cpu", devices="auto", strategy="auto")
     fabric.launch()
     print(f"Fabric device: {fabric.device}")
     torch.set_default_dtype(torch.float32)
     torch.set_printoptions(precision=4, sci_mode=False)
-    reset_all(seed=1)
-    run_uda_experiments(fabric, num_epochs=1)
+
+    config = {
+        # Experiment details
+        seed: 1,
+
+        # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
+        model: 'MLP',
+        resnet_size: 18, # 18 or 50
+        pretrain: False
+        num_pretrain_epochs: 1 # if pretrain is True
+        loss: EuclideanLoss, # nn.CrossEntropyLoss()
+        optimizer: 'adam', # alternative: sgd
+        learning_rate: 1e-3, # use 1e-4 for ResNets or a learning scheduler
+        num_epochs: 1,
+
+        # Data loader options
+        batch_size: 64,
+        shuffle: False,
+        drop_last: True,
+
+        # Distribution shift scenario (MNIST_to_USPS, CIFAR10C, ...)
+        scenario: 'MNIST_to_USPS',
+        class_balanced: False,
+
+        # Algorithms to compare against
+        algs: ['wrr', 'weighted_wrr']
+    }
+
+    reset_all(seed=config['seed'])
+    run_uda_experiments(fabric, config)
