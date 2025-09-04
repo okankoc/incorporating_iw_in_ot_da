@@ -5,29 +5,31 @@ from torch.autograd import Function
 import torch.distributions
 import torch.nn.functional as F
 import numpy as np
-import ot
+from scipy.spatial.distance import cdist
 import geomloss
 import copy
 
 # Wasserstein Marginal Distance regularized source risk minimization using model outputs
 class WRR:
-    def __init__(self, fabric, model, loss_fun, learning_rate, weight=False, p=1, scale=1.0, reg=1e-4, debug=False):
-        self.loss_fun = copy.deepcopy(loss_fun)
-        self.opt = torch.optim.Adam(
-            model.parameters(), lr=learning_rate, betas=(0.9, 0.999), eps=1e-8, weight_decay=0.0
-        )
+    def __init__(self, config, fabric, model, loss_fun, weight):
+        if config['optimizer'] == 'adam':
+            self.opt = torch.optim.Adam(model.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'])
+        elif config['optimizer'] == 'sgd':
+            self.opt = torch.optim.SGD(model.parameters(), lr=config['learning_rate'], momentum=config['momentum'], weight_decay=config['weight_decay'])
+        else:
+            raise Exception('Unknown optimizer!')
         fabric.setup(model, self.opt)
-        # self.opt = torch.optim.SGD(self.model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=0.0)
-        # For debugging
+
+        self.loss_fun = copy.deepcopy(loss_fun)
         self.weight = weight
         if weight is True:
             self.name = 'weighted-WRR'
         else:
             self.name = "WRR"
-        self.scale = scale
-        self.p = p
-        self.reg = reg
-        self.debug = debug
+        self.scale = config['wrr_scale']
+        self.p = config['wrr_norm']
+        self.reg = config['wrr_entropy_reg']
+        self.debug = config['wrr_debug']
 
     def calc_ot(self, f_source, f_target):
         num_source = f_source.shape[0]
@@ -36,32 +38,27 @@ class WRR:
         ### Python crashes regularly with POT so switching to GeomLoss
         ot_loss = geomloss.SamplesLoss(loss="sinkhorn", p=self.p, blur=self.reg)
         total_cost = ot_loss(f_source, f_target)
-
-        """
-        cost_mat = ot.utils.euclidean_distances(f_source, f_target, squared=self.use_squared_dist)
-        scale = torch.max(cost_mat)
-        cost_mat = cost_mat / scale
-        # Weights of the points
-        w_source = torch.ones(num_source) / num_source
-        w_target = torch.ones(num_target) / num_target
-        prob_mat = ot.emd(a=w_source, b=w_target, M=cost_mat).type(torch.float)
-        total_cost = torch.sum(prob_mat * cost_mat)
-        """
-
         return total_cost
+
+    def calc_dist_mat(self, f_source, f_target):
+        ''' Replacement for the OT library's ot.utils.euclidean_distances functionality. '''
+        n_source = f_source.shape[0]
+        n_target = f_target.shape[0]
+        f_s_big = f_source.repeat_interleave(n_target, dim=0)
+        f_t_big = f_target.repeat(n_source, 1)
+        cost_mat = torch.linalg.vector_norm(f_s_big - f_t_big, ord=2, dim=1).reshape(n_source, n_target)
+        if self.p == 2:
+            return cost_mat ** 2
+        return cost_mat
 
 
     def compute_weighted_wrr(self, device, pred_source, pred_target, y_source):
         # loss matrix
-        num_source = pred_source.shape[0]
         num_target = pred_target.shape[0]
         w_target = torch.ones(num_target, device=device) / num_target
 
-        if self.p == 1:
-            squared = False
-        else:
-            squared = True
-        cost_mat = self.scale * ot.utils.euclidean_distances(pred_source, pred_target, squared)
+        cost_mat = self.scale * self.calc_dist_mat(pred_source, pred_target)
+        # cost_mat = self.scale * ot.utils.euclidean_distances(pred_source, pred_target, squared)
         self.loss_fun.reduction = 'none'
         losses = self.loss_fun(pred_source, y_source)
         self.loss_fun.reduction = 'mean'

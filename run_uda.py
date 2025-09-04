@@ -5,7 +5,6 @@ import types
 import numpy as np
 import torch
 import torchvision.models
-import ot
 import geomloss
 from torch import nn
 import matplotlib
@@ -50,37 +49,30 @@ def get_methods(config, model, loss_fun, fabric):
     if 'wrr' in config['algs']:
         methods.append(
             WRR(
+                config,
                 fabric,
                 model,
                 loss_fun,
-                learning_rate=1e-4,
-                weight=False,
-                p=1,
-                scale=1.0,
-                reg=1e-2,
-                debug=False)
+                weight=False)
         )
-    elif 'weighted_wrr' in config['algs']:
+    if 'weighted_wrr' in config['algs']:
         methods.append(
             WRR(
+                config,
                 fabric,
                 model,
                 loss_fun,
-                learning_rate=1e-4,
-                weight=True,
-                p=1,
-                scale=1.0,
-                reg=1e-2,
-                debug=True))
+                weight=True)
+        )
     return methods
 
 
-def run_uda(config, methods, model, scenario, loss_fun, num_epochs, fabric):
+def run_uda(config, methods, model, scenario, loss_fun, fabric):
     # Run adaptation
     for method in methods:
         print("===============================")
         print(f"Method {method.name}")
-        reset_all(seed=1)
+        reset_all(seed=config['seed'])
         for epoch in range(config['num_epochs']):
             batch_idx = 0
             print(f"Epoch {epoch+1}")
@@ -99,6 +91,7 @@ def run_uda(config, methods, model, scenario, loss_fun, num_epochs, fabric):
 
 
 def init_scenario(config, fabric):
+    dataloader_options = {"batch_size": config['batch_size'], "shuffle": config['shuffle'], "drop_last": config['drop_last']}
     if config['scenario'] == 'MNIST_to_USPS':
         scenario = shifts.MNIST_to_USPS(dataloader_options, use_sampler=True, class_balanced=config['class_balanced'])
     elif config['scenario'] == 'USPS_to_MNIST':
@@ -169,14 +162,14 @@ def run_uda_experiments(fabric, config):
     scenario = init_scenario(config, fabric)
     model = init_model(config, scenario)
     if config['pretrain'] is True:
-        model = utils.train_model_on_source(model, loss_fun, scenario, num_epochs=config['num_pretrain_epochs'], fabric=fabric)
+        model = utils.train_model_on_source(config, model, loss_fun, scenario, fabric)
     else:
         fabric.setup(model)
     model.save_params()
     # Report initial performance of a loaded source-trained model
     utils.report_acc(scenario, model, loss_fun)
     methods = get_methods(config, model, loss_fun, fabric)
-    run_uda(methods, model, scenario, loss_fun, num_epochs, fabric)
+    run_uda(config, methods, model, scenario, loss_fun, fabric)
 
 
 def check_shared_support():
@@ -211,38 +204,46 @@ def check_shared_support():
 
 
 if __name__ == "__main__":
-    fabric = Fabric(accelerator="cpu", devices="auto", strategy="auto")
-    fabric.launch()
-    print(f"Fabric device: {fabric.device}")
     torch.set_default_dtype(torch.float32)
     torch.set_printoptions(precision=4, sci_mode=False)
 
     config = {
         # Experiment details
-        seed: 1,
+        'seed': 1,
+        'device': 'cpu', # or auto to find gpu automatically
 
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        model: 'MLP',
-        resnet_size: 18, # 18 or 50
-        pretrain: False
-        num_pretrain_epochs: 1 # if pretrain is True
-        loss: EuclideanLoss, # nn.CrossEntropyLoss()
-        optimizer: 'adam', # alternative: sgd
-        learning_rate: 1e-3, # use 1e-4 for ResNets or a learning scheduler
-        num_epochs: 1,
+        'model': 'MLP',
+        'resnet_size': 18, # 18 or 50
+        'pretrain': False,
+        'num_pretrain_epochs': 1, # if pretrain is True
+        'loss': EuclideanLoss(), # nn.CrossEntropyLoss()
+        'optimizer': 'adam', # alternative: sgd
+        'learning_rate': 1e-3, # use 1e-4 for ResNets or a learning scheduler
+        'momentum': 0.9, # for SGD
+        'weight_decay': 0.0,
+        'num_epochs': 1,
 
         # Data loader options
-        batch_size: 64,
-        shuffle: False,
-        drop_last: True,
+        'batch_size': 64,
+        'shuffle': False,
+        'drop_last': True,
 
         # Distribution shift scenario (MNIST_to_USPS, CIFAR10C, ...)
-        scenario: 'MNIST_to_USPS',
-        class_balanced: False,
+        'scenario': 'MNIST_to_USPS',
+        'class_balanced': False,
 
         # Algorithms to compare against
-        algs: ['wrr', 'weighted_wrr']
+        'algs': ['weighted_wrr'],
+        'wrr_scale': 1.0,
+        'wrr_norm': 1,
+        'wrr_entropy_reg': 1e-4,
+        'wrr_debug': True,
     }
 
+    fabric = Fabric(accelerator=config['device'], devices="auto", strategy="auto")
+    fabric.launch()
+    print(f"Fabric device: {fabric.device}")
     reset_all(seed=config['seed'])
+
     run_uda_experiments(fabric, config)

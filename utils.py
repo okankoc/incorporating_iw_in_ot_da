@@ -44,7 +44,7 @@ def report_acc(scenario, model, loss_fun, report_train=False):
     return loss_source, acc_source, loss_target, acc_target
 
 
-def train_model_on_source(model, loss_fun, scenario, num_epochs, fabric):
+def train_model_on_source(config, model, loss_fun, scenario, num_epochs, fabric):
     save_path = "save_files/" + scenario.name + "/" + model.name + ".pth"
     try:
         # Load parameters from a file
@@ -53,14 +53,19 @@ def train_model_on_source(model, loss_fun, scenario, num_epochs, fabric):
         log.info(f"Saved model found! Loading parameters from file: {save_path}")
     except:
         log.info(f"Either model has changed or save file {save_path} not found. Training from scratch...")
-        opt = torch.optim.Adam(model.parameters(), lr=1e-3)
+        if config['optimizer'] == 'adam':
+            opt = torch.optim.Adam(model.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'])
+        elif config['optimizer'] == 'sgd':
+            opt = torch.optim.SGD(model.parameters(), lr=config['learning_rate'], momentum=config['momentum'], weight_decay=config['weight_decay'])
+        else:
+            raise Exception('Unknown optimizer!')
         fabric.setup(model, opt)
         train(
             scenario.source_dataloader,
             model,
             loss_fun,
             opt,
-            num_epochs,
+            config['num_pretrain_epochs'],
             fabric,
             report_every=10,
         )
