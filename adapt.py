@@ -8,10 +8,11 @@ import numpy as np
 from scipy.spatial.distance import cdist
 import geomloss
 import copy
+import ot      # We don't need POT if we don't need to compute entanglement!
 
-# Wasserstein Marginal Distance regularized source risk minimization using model outputs
-class WRR:
-    def __init__(self, config, fabric, model, loss_fun, weight):
+# Weighted Wassertein regularized risk
+class WWRR:
+    def __init__(self, config, fabric, model, loss_fun):
         if config['optimizer'] == 'adam':
             self.opt = torch.optim.Adam(model.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'])
         elif config['optimizer'] == 'sgd':
@@ -21,15 +22,125 @@ class WRR:
         fabric.setup(model, self.opt)
 
         self.loss_fun = copy.deepcopy(loss_fun)
-        self.weight = weight
-        if weight is True:
-            self.name = 'weighted-WRR'
-        else:
-            self.name = "WRR"
+        self.name = 'weighted-WRR'
         self.scale = config['wrr_scale']
         self.p = config['wrr_norm']
         self.reg = config['wrr_entropy_reg']
-        self.debug = config['wrr_debug']
+        self.best_val_loss = torch.inf
+
+    def adapt(self, config, model, fabric, X_source, y_source, X_target):
+        self.opt.zero_grad()
+        pred_source = model(X_source)
+        pred_target = model(X_target)
+        source_loss = self.loss_fun(pred_source, y_source)
+        # loss matrix
+        num_target = pred_target.shape[0]
+        w_target = torch.ones(num_target, device=fabric.device) / num_target
+
+        cost_mat = torch.cdist(pred_source, pred_target, 2) ** self.p
+        self.loss_fun.reduction = 'none'
+        self.losses = self.loss_fun(pred_source, y_source)
+        self.loss_fun.reduction = 'mean'
+        cost_mat_full = cost_mat + self.losses[:, None]
+        self.ot_mat = torch.softmax(-cost_mat_full / self.reg, dim=0) * w_target[None, :]
+        self.wrr_weighted_cost = torch.sum(self.ot_mat * cost_mat_full)
+
+        if config['add_source_loss'] is True:
+            loss = self.scale * source_loss + self.wrr_weighted_cost
+        else:
+            loss = self.wrr_weighted_cost
+
+        fabric.backward(loss)
+        self.opt.step()
+
+
+    def checkpoint(self, config, model, fabric, X_source, y_source, X_target, save_path):
+        pred_source = model(X_source)
+        pred_target = model(X_target)
+        source_loss = self.loss_fun(pred_source, y_source)
+        # loss matrix
+        num_target = pred_target.shape[0]
+        w_target = torch.ones(num_target, device=fabric.device) / num_target
+        cost_mat = torch.cdist(pred_source, pred_target, 2) ** self.p
+        self.loss_fun.reduction = 'none'
+        losses = self.loss_fun(pred_source, y_source)
+        self.loss_fun.reduction = 'mean'
+        cost_mat_full = cost_mat + losses[:, None]
+        ot_mat = torch.softmax(-cost_mat_full / self.reg, dim=0) * w_target[None, :]
+        wrr_weighted_cost = torch.sum(ot_mat * cost_mat_full)
+
+        val_loss = wrr_weighted_cost
+        if val_loss < self.best_val_loss:
+            print(f"Saving loss {val_loss} as best loss so far")
+            # save dictionary with everything needed
+            checkpoint = {
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': self.opt.state_dict(),
+                'loss': val_loss
+            }
+            torch.save(checkpoint, save_path)
+            self.best_val_loss = val_loss
+        else:
+            print(f"Loading previous model with loss {self.best_val_loss} vs. current loss {val_loss}")
+            checkpoint = torch.load(save_path, weights_only=True)
+            model.load_state_dict(checkpoint['model_state_dict'])
+            self.opt.load_state_dict(checkpoint['optimizer_state_dict'])
+
+
+    def debug(self, config, model, fabric, X_source, y_source, X_target, y_target):
+        pred_source = model(X_source)
+        pred_target = model(X_target)
+        source_loss = self.loss_fun(pred_source, y_source)
+        # loss matrix
+        num_target = pred_target.shape[0]
+        w_target = torch.ones(num_target, device=fabric.device) / num_target
+        cost_mat = torch.cdist(pred_source, pred_target, 2) ** self.p
+        self.loss_fun.reduction = 'none'
+        losses = self.loss_fun(pred_source, y_source)
+        self.loss_fun.reduction = 'mean'
+        cost_mat_full = cost_mat + losses[:, None]
+        ot_mat = torch.softmax(-cost_mat_full / self.reg, dim=0) * w_target[None, :]
+        wrr_weighted_cost = torch.sum(ot_mat * cost_mat_full)
+
+        source_weights = torch.sum(ot_mat, dim=1)
+        weighted_source_loss = torch.sum(source_weights * losses)
+        print(f"Weighted WRR: {wrr_weighted_cost.item()}, weighted_source_loss: {weighted_source_loss.item()}")
+
+        if config['calc_entanglement'] == True:
+            entanglement = torch.sum(ot_mat * (torch.cdist(y_source, y_target) ** self.p))
+            print(f"Entanglement: {entanglement}")
+        if config['calc_margin'] == True:
+            # Get correct points with matching labels
+            # Find the gap between max and second max (by sorting for now)
+            pred_sorted_val, pred_sorted_ind = torch.sort(pred_source, dim=1, descending=True)
+            correct = (pred_sorted_ind[:, 0] == y_source.argmax(1))
+            margin = pred_sorted_val[correct, 0] - pred_sorted_val[correct, 1]
+            std_margin, avg_margin = torch.std_mean(margin)
+            print(f"Margin mean: {avg_margin}, std: {std_margin}")
+        if config['calc_grad_norms'] == True:
+            grad_norms = []
+            for w in model.parameters():
+                 grad_norms.append(torch.linalg.vector_norm(w.grad, ord=2, dim=None))
+            print(f"Grad norms: {grad_norms}")
+
+
+# Wasserstein Marginal Distance regularized source risk minimization using model outputs
+class WRR:
+    def __init__(self, config, fabric, model, loss_fun):
+        if config['optimizer'] == 'adam':
+            self.opt = torch.optim.Adam(model.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'])
+        elif config['optimizer'] == 'sgd':
+            self.opt = torch.optim.SGD(model.parameters(), lr=config['learning_rate'], momentum=config['momentum'], weight_decay=config['weight_decay'])
+        else:
+            raise Exception('Unknown optimizer!')
+        fabric.setup(model, self.opt)
+
+        self.loss_fun = copy.deepcopy(loss_fun)
+        self.name = "WRR"
+        self.scale = config['wrr_scale']
+        self.p = config['wrr_norm']
+        self.reg = config['wrr_entropy_reg']
+        self.best_val_loss = torch.inf
 
     def calc_ot(self, f_source, f_target):
         num_source = f_source.shape[0]
@@ -40,54 +151,67 @@ class WRR:
         total_cost = ot_loss(f_source, f_target)
         return total_cost
 
-    def calc_dist_mat(self, f_source, f_target):
-        ''' Replacement for the OT library's ot.utils.euclidean_distances functionality. '''
-        n_source = f_source.shape[0]
-        n_target = f_target.shape[0]
-        f_s_big = f_source.repeat_interleave(n_target, dim=0)
-        f_t_big = f_target.repeat(n_source, 1)
-        cost_mat = torch.linalg.vector_norm(f_s_big - f_t_big, ord=2, dim=1).reshape(n_source, n_target)
-        if self.p == 2:
-            return cost_mat ** 2
-        return cost_mat
 
-
-    def compute_weighted_wrr(self, device, pred_source, pred_target, y_source):
-        # loss matrix
-        num_target = pred_target.shape[0]
-        w_target = torch.ones(num_target, device=device) / num_target
-
-        cost_mat = self.scale * self.calc_dist_mat(pred_source, pred_target)
-        # cost_mat = self.scale * ot.utils.euclidean_distances(pred_source, pred_target, squared)
-        self.loss_fun.reduction = 'none'
-        losses = self.loss_fun(pred_source, y_source)
-        self.loss_fun.reduction = 'mean'
-        cost_mat_full = cost_mat + losses[:, None]
-        ot_mat = torch.softmax(-cost_mat_full / self.reg, dim=0) * w_target[None, :]
-        wrr_weighted_cost = torch.sum(ot_mat * cost_mat_full)
-        if self.debug is True:
-            source_loss = torch.mean(losses)
-            ot_cost = wrr_weighted_cost - source_loss
-            print(f"Weighted WRR: {wrr_weighted_cost.item()}, source_loss: {source_loss.item()}, ot_dist: {ot_cost.item()}")
-        return wrr_weighted_cost
-
-    def adapt(self, model, fabric, X_source, y_source, X_target, y_target=[]):
+    def adapt(self, config, model, fabric, X_source, y_source, X_target):
+        self.opt.zero_grad()
         pred_source = model(X_source)
         pred_target = model(X_target)
-        if self.weight is True:
-            loss = self.compute_weighted_wrr(fabric.device, pred_source, pred_target, y_source)
-        else:
-            ot_cost = self.calc_ot(pred_source, pred_target)
-            source_loss = self.loss_fun(pred_source, y_source)
-            loss = source_loss + self.scale * ot_cost
-            if self.debug is True:
-                print(f"Unweighted WRR: {loss.item()}, source_loss: {source_loss.item()}, ot_dist: {ot_cost.item()}")
-        fabric.backward(loss)
-        # if self.debug is True:
-        #     grad_norm = 0
-        #     for w in self.model.parameters():
-        #         grad_norm += torch.sum(w.grad**2)
-        #     grad_norm = torch.sqrt(grad_norm)
-        #     print(f"WRR: {loss.item()}, Theta-derivative norm: {grad_norm}")
+        source_loss = self.loss_fun(pred_source, y_source)
+        ot_cost = self.calc_ot(pred_source, pred_target)
+        self.loss = source_loss + self.scale * ot_cost
+        fabric.backward(self.loss)
         self.opt.step()
-        self.opt.zero_grad()
+
+
+    def checkpoint(self, config, model, fabric, X_source, y_source, X_target, save_path):
+        pred_source = model(X_source)
+        pred_target = model(X_target)
+        source_loss = self.loss_fun(pred_source, y_source)
+        ot_cost = self.calc_ot(pred_source, pred_target)
+        val_loss = source_loss + self.scale * ot_cost
+        if val_loss < self.best_val_loss:
+            print(f"Saving loss {val_loss} as best loss so far")
+            # save dictionary with everything needed
+            checkpoint = {
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': self.opt.state_dict(),
+                'loss': val_loss
+            }
+            torch.save(checkpoint, save_path)
+            self.best_val_loss = val_loss
+        else:
+            print(f"Loading previous model with loss {self.best_val_loss} vs. current loss {val_loss}")
+            checkpoint = torch.load(save_path, weights_only=True)
+            model.load_state_dict(checkpoint['model_state_dict'])
+            self.opt.load_state_dict(checkpoint['optimizer_state_dict'])
+
+
+    def debug(self, config, model, fabric, X_source, y_source, X_target, y_target):
+        pred_source = model(X_source)
+        pred_target = model(X_target)
+        source_loss = self.loss_fun(pred_source, y_source)
+
+        print(f"Unweighted WRR: {self.loss.item()}, source_loss: {source_loss.item()}")
+        if config['calc_entanglement'] == True:
+            num_source = pred_source.shape[0]
+            w_source = torch.ones(num_source, device=fabric.device) / num_source
+            num_target = pred_target.shape[0]
+            w_target = torch.ones(num_target, device=fabric.device) / num_target
+            # The problem with using POT is that Sinkhorn is not converging for low reg.
+            cost_mat = (torch.cdist(pred_source, pred_target) ** self.p)
+            ot_mat = ot.emd(w_source, w_target, cost_mat, numItermax=5000)
+            entanglement = torch.sum(ot_mat * (torch.cdist(y_source, y_target) ** self.p))
+            print(f"Entanglement: {entanglement}")
+        if config['calc_margin'] == True:
+            # Get correct points with matching labels
+            # Find the gap between max and second max (by sorting for now)
+            pred_sorted_val, pred_sorted_ind = torch.sort(pred_source, dim=1, descending=True)
+            correct = (pred_sorted_ind[:, 0] == y_source.argmax(1))
+            margin = pred_sorted_val[correct, 0] - pred_sorted_val[correct, 1]
+            std_margin, avg_margin = torch.std_mean(margin)
+            print(f"Margin mean: {avg_margin}, std: {std_margin}")
+        if config['calc_grad_norms'] is True:
+            grad_norms = []
+            for w in model.parameters():
+                 grad_norms.append(torch.linalg.vector_norm(w.grad, ord=2, dim=None))
+            print(f"Grad norms: {grad_norms}")

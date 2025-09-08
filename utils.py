@@ -27,12 +27,13 @@ def test(dataloader, model, loss_fun):
     return test_loss, correct
 
 
-def report_acc(scenario, model, loss_fun, report_train=False):
-    if report_train:
-        # These are very slow
+def report_acc(scenario, model, loss_fun, report_source_train, report_target_train):
+    # These are very slow
+    if report_source_train:
         print(f"Reporting accuracy/loss on source {scenario.source_name} training dataset...")
         test(scenario.source_dataloader, model, loss_fun)
 
+    if report_target_train:
         print(f"Reporting accuracy/loss on target {scenario.target_name} training dataset...")
         test(scenario.target_dataloader, model, loss_fun)
 
@@ -44,7 +45,7 @@ def report_acc(scenario, model, loss_fun, report_train=False):
     return loss_source, acc_source, loss_target, acc_target
 
 
-def train_model_on_source(config, model, loss_fun, scenario, num_epochs, fabric):
+def train_model_on_source(config, model, loss_fun, scenario, fabric):
     save_path = "save_files/" + scenario.name + "/" + model.name + ".pth"
     try:
         # Load parameters from a file

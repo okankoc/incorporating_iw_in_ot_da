@@ -13,7 +13,7 @@ import utils
 
 
 class USPS_to_MNIST:
-    def __init__(self, dataloader_options, use_sampler):
+    def __init__(self, dataloader_options, test_dataloader_options, use_sampler):
         self.name = "USPS_TO_MNIST"
         self.num_classes = 10
         self.dataloader_options = dataloader_options
@@ -41,15 +41,15 @@ class USPS_to_MNIST:
         self.target_dataloader = DataLoader(self.target_data, **dataloader_options)
 
         test_data = datasets.USPS(root="data/USPS", train=False, download=True, transform=self.transforms_source)
-        self.source_test_dataloader = DataLoader(test_data, **dataloader_options)
+        self.source_test_dataloader = DataLoader(test_data, **test_dataloader_options)
         test_data = datasets.MNIST(root="data", train=False, download=True, transform=self.transforms_target)
-        self.target_test_dataloader = DataLoader(test_data, **dataloader_options)
+        self.target_test_dataloader = DataLoader(test_data, **test_dataloader_options)
         # calc_w_distance_label_shift(self)
         self.labels = np.array([str(i) for i in range(10)])
 
 
 class MNIST_to_USPS:
-    def __init__(self, dataloader_options, use_sampler, class_balanced):
+    def __init__(self, dataloader_options, test_dataloader_options, use_sampler, class_balanced):
         self.name = "MNIST_TO_USPS"
         self.num_classes = 10
         self.dataloader_options = dataloader_options
@@ -91,35 +91,35 @@ class MNIST_to_USPS:
                 source_sampler = WeightedRandomSampler(
                     weights=source_sample_weights, num_samples=len(source_sample_weights), replacement=True
                 )
-                self.source_test_dataloader = DataLoader(source_test_data, sampler=source_sampler, **dataloader_options)
+                self.source_test_dataloader = DataLoader(source_test_data, sampler=source_sampler, **test_dataloader_options)
                 target_class_weights = 1.0 / torch.bincount(torch.tensor(target_test_data.targets)).float()
                 target_sample_weights = target_class_weights[target_test_data.targets]
                 target_sampler = WeightedRandomSampler(
                     weights=target_sample_weights, num_samples=len(source_test_data), replacement=True
                 )
-                self.target_test_dataloader = DataLoader(target_test_data, sampler=target_sampler, **dataloader_options)
+                self.target_test_dataloader = DataLoader(target_test_data, sampler=target_sampler, **test_dataloader_options)
             else:
                 self.source_dataloader = DataLoader(self.source_data, **dataloader_options)
-                self.source_test_dataloader = DataLoader(source_test_data, **dataloader_options)
+                self.source_test_dataloader = DataLoader(source_test_data, **test_dataloader_options)
                 target_sampler = RandomSampler(self.target_data, replacement=True, num_samples=len(self.source_data))
                 self.target_dataloader = DataLoader(self.target_data, sampler=target_sampler, **dataloader_options)
                 target_test_sampler = RandomSampler(
                     target_test_data, replacement=True, num_samples=len(source_test_data)
                 )
                 self.target_test_dataloader = DataLoader(
-                    target_test_data, sampler=target_test_sampler, **dataloader_options
+                    target_test_data, sampler=target_test_sampler, **test_dataloader_options
                 )
         else:
             self.source_dataloader = DataLoader(self.source_data, **dataloader_options)
             self.target_dataloader = DataLoader(self.target_data, **dataloader_options)
-            self.source_test_dataloader = DataLoader(source_test_data, **dataloader_options)
-            self.target_test_dataloader = DataLoader(target_test_data, **dataloader_options)
+            self.source_test_dataloader = DataLoader(source_test_data, **test_dataloader_options)
+            self.target_test_dataloader = DataLoader(target_test_data, **test_dataloader_options)
         # calc_w_distance_label_shift(self)
         self.labels = np.array([str(i) for i in range(10)])
 
 
 class MNIST_to_MNIST_M:
-    def __init__(self, dataloader_options, preprocess):
+    def __init__(self, dataloader_options, test_dataloader_options, preprocess):
         self.name = "MNIST_TO_MNISTM"
         if preprocess is True:
             self.process_MNIST_M_labels(root="data/MNIST-M", use_train=True)
@@ -141,9 +141,9 @@ class MNIST_to_MNIST_M:
         self.target_dataloader = DataLoader(self.target_data, **dataloader_options)
 
         source_test_data = datasets.MNIST(root="data", train=False, download=True, transform=self.transforms_source)
-        self.source_test_dataloader = DataLoader(source_test_data, **dataloader_options)
+        self.source_test_dataloader = DataLoader(source_test_data, **test_dataloader_options)
         target_test_data = datasets.ImageFolder(root="data/MNIST-M/test", transform=self.transforms_target)
-        self.target_test_dataloader = DataLoader(target_test_data, **dataloader_options)
+        self.target_test_dataloader = DataLoader(target_test_data, **test_dataloader_options)
         # calc_w_distance_label_shift(self)
         self.labels = np.array([str(i) for i in range(10)])
 
@@ -169,7 +169,7 @@ class MNIST_to_MNIST_M:
 
 
 class SVHN_to_MNIST:
-    def __init__(self, dataloader_options, class_balanced):
+    def __init__(self, dataloader_options, test_dataloader_options, class_balanced):
         self.name = "SVHN_TO_MNIST"
         self.dataloader_options = dataloader_options
         self.source_name = "SVHN"
@@ -210,7 +210,7 @@ class SVHN_to_MNIST:
                 weights=source_sample_weights, num_samples=len(source_sample_weights), replacement=True
             )
             self.source_test_dataloader = DataLoader(
-                source_test_data, sampler=source_test_sampler, **dataloader_options
+                source_test_data, sampler=source_test_sampler, **test_dataloader_options
             )
             target_class_weights = 1.0 / torch.bincount(torch.tensor(target_test_data.targets)).float()
             target_sample_weights = target_class_weights[target_test_data.targets]
@@ -218,13 +218,13 @@ class SVHN_to_MNIST:
                 weights=target_sample_weights, num_samples=len(target_sample_weights), replacement=True
             )
             self.target_test_dataloader = DataLoader(
-                target_test_data, sampler=target_test_sampler, **dataloader_options
+                target_test_data, sampler=target_test_sampler, **test_dataloader_options
             )
         else:
             self.source_dataloader = DataLoader(self.source_data, **dataloader_options)
             self.target_dataloader = DataLoader(self.target_data, **dataloader_options)
-            self.source_test_dataloader = DataLoader(source_test_data, **dataloader_options)
-            self.target_test_dataloader = DataLoader(target_test_data, **dataloader_options)
+            self.source_test_dataloader = DataLoader(source_test_data, **test_dataloader_options)
+            self.target_test_dataloader = DataLoader(target_test_data, **test_dataloader_options)
         # calc_w_distance_label_shift(self)
         self.labels = np.array([str(i) for i in range(10)])
 
@@ -235,7 +235,7 @@ class SVHN_to_MNIST:
 
 
 class CIFAR_CORRUPT:
-    def __init__(self, dataloader_options, corruptions):
+    def __init__(self, dataloader_options, test_dataloader_options, corruptions):
         self.name = "CIFAR10_TO_CIFAR10C"
         self.dataloader_options = dataloader_options
         self.source_name = "CIFAR10"
@@ -270,9 +270,9 @@ class CIFAR_CORRUPT:
         source_test_data = datasets.CIFAR10(
             root="data/CIFAR10", train=False, download=True, transform=self.transforms_source
         )
-        self.source_test_dataloader = DataLoader(source_test_data, **dataloader_options)
+        self.source_test_dataloader = DataLoader(source_test_data, **test_dataloader_options)
         target_test_data = utils.GenericDataset(X_target_test, y_target_test, transform=self.transforms_target)
-        self.target_test_dataloader = DataLoader(target_test_data, **dataloader_options)
+        self.target_test_dataloader = DataLoader(target_test_data, **test_dataloader_options)
         # calc_w_distance_label_shift(self)
         self.labels = np.array(
             ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
@@ -281,7 +281,7 @@ class CIFAR_CORRUPT:
 
 # For now the scenario we consider: training on Art, Clipart, Product -> testing on Real World
 class OFFICEHOME:
-    def __init__(self, dataloader_options, size=(32, 32), train_ratio=0.8, grayscale=False):
+    def __init__(self, dataloader_options, test_dataloader_options, size=(32, 32), train_ratio=0.8, grayscale=False):
         self.name = "OFFICEHOME"
         self.num_classes = 65
         self.dataloader_options = dataloader_options
@@ -310,8 +310,8 @@ class OFFICEHOME:
         # Load both datasets
         self.source_dataloader = DataLoader(train_source, **dataloader_options)
         self.target_dataloader = DataLoader(train_target, **dataloader_options)
-        self.source_test_dataloader = DataLoader(test_source, **dataloader_options)
-        self.target_test_dataloader = DataLoader(test_target, **dataloader_options)
+        self.source_test_dataloader = DataLoader(test_source, **test_dataloader_options)
+        self.target_test_dataloader = DataLoader(test_target, **test_dataloader_options)
 
         self.source_name = "product"
         self.target_name = "real"
@@ -359,8 +359,8 @@ class PORTRAITS:
         # Load both datasets
         self.source_dataloader = DataLoader(train_source, **dataloader_options)
         self.target_dataloader = DataLoader(train_target, **dataloader_options)
-        self.source_test_dataloader = DataLoader(test_source, **dataloader_options)
-        self.target_test_dataloader = DataLoader(test_target, **dataloader_options)
+        self.source_test_dataloader = DataLoader(test_source, **test_dataloader_options)
+        self.target_test_dataloader = DataLoader(test_target, **test_dataloader_options)
         # calc_w_distance_label_shift(self)
         self.labels = np.array(["Female", "Male"])
 

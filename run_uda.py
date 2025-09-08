@@ -13,7 +13,7 @@ from lightning import Fabric
 
 import utils
 import shifts
-from adapt import WRR
+from adapt import WRR, WWRR
 from models.conv import ConvNet, ConvNet2, LeNet, SmallCNN
 from models.mlp import MultiLayerPerceptron as MLP
 
@@ -52,17 +52,15 @@ def get_methods(config, model, loss_fun, fabric):
                 config,
                 fabric,
                 model,
-                loss_fun,
-                weight=False)
+                loss_fun)
         )
     if 'weighted_wrr' in config['algs']:
         methods.append(
-            WRR(
+            WWRR(
                 config,
                 fabric,
                 model,
-                loss_fun,
-                weight=True)
+                loss_fun)
         )
     return methods
 
@@ -70,42 +68,56 @@ def get_methods(config, model, loss_fun, fabric):
 def run_uda(config, methods, model, scenario, loss_fun, fabric):
     # Run adaptation
     for method in methods:
+        model.train()
         print("===============================")
         print(f"Method {method.name}")
-        reset_all(seed=config['seed'])
+        # reset_all(seed=config['seed'])
         for epoch in range(config['num_epochs']):
             batch_idx = 0
             print(f"Epoch {epoch+1}")
             for (X_train, y_train), (X_shift, y_shift) in zip(scenario.source_dataloader, scenario.target_dataloader):
                 y_train = utils.one_hot(y_train, scenario.num_classes)
-                y_shift = utils.one_hot(y_shift, scenario.num_classes)
                 if batch_idx % 10 == 0:
                     print(f"Batch id: {batch_idx}")
+                method.adapt(config, model, fabric, X_train, y_train, X_shift)
+                if config['debug'] is True and (batch_idx % config['print_every_n'] == 0):
+                    debug_method(config, method, model, scenario, fabric)
                 batch_idx += 1
-                method.adapt(model, fabric, X_train, y_train, X_shift, y_shift)
 
             print("===============================")
             print(f"Method {method.name}")
-            utils.report_acc(scenario, model, loss_fun)
+            utils.report_acc(scenario, model, loss_fun, config['report_source_train_risk'], config['report_target_train_risk'])
         model.restore_params()
 
 
+def debug_method(config, method, model, scenario, fabric):
+    for (X_train, y_train), (X_shift, y_shift) in zip(scenario.source_test_dataloader, scenario.target_test_dataloader):
+        y_train = utils.one_hot(y_train, scenario.num_classes)
+        y_shift = utils.one_hot(y_shift, scenario.num_classes)
+        method.debug(config, model, fabric, X_train, y_train, X_shift, y_shift)
+        if config['checkpoint'] is True:
+            save_path = "save_files/" + scenario.name + "/" + model.name + "_" + method.name + "_checkpoint.pth"
+            method.checkpoint(config, model, fabric, X_train, y_train, X_shift, save_path)
+        break
+
+
 def init_scenario(config, fabric):
-    dataloader_options = {"batch_size": config['batch_size'], "shuffle": config['shuffle'], "drop_last": config['drop_last']}
+    dataloader_options = {"batch_size": config['batch_size'], "shuffle": False, "drop_last": True}
+    test_dataloader_options = {"batch_size": config['test_batch_size'], "shuffle": False, "drop_last": True}
     if config['scenario'] == 'MNIST_to_USPS':
-        scenario = shifts.MNIST_to_USPS(dataloader_options, use_sampler=True, class_balanced=config['class_balanced'])
+        scenario = shifts.MNIST_to_USPS(dataloader_options, test_dataloader_options, use_sampler=True, class_balanced=config['class_balanced'])
     elif config['scenario'] == 'USPS_to_MNIST':
-        scenario = shifts.USPS_to_MNIST(dataloader_options, use_sampler=True)
+        scenario = shifts.USPS_to_MNIST(dataloader_options, test_dataloader_options, use_sampler=True)
     elif config['scenario'] == 'MNIST_to_MNIST_M':
-        scenario = shifts.MNIST_to_MNIST_M(dataloader_options, preprocess=False)
+        scenario = shifts.MNIST_to_MNIST_M(dataloader_options, test_dataloader_options, preprocess=False)
     elif config['scenario'] == 'SVHN_to_MNIST':
-        scenario = shifts.SVHN_to_MNIST(dataloader_options, class_balanced=config['class_balanced'])
+        scenario = shifts.SVHN_to_MNIST(dataloader_options, test_dataloader_options, class_balanced=config['class_balanced'])
     elif config['scenario'] == 'CIFAR10C':
-        scenario = shifts.CIFAR_CORRUPT(dataloader_options, corruptions=["fog", "frost", "snow"])
+        scenario = shifts.CIFAR_CORRUPT(dataloader_options, test_dataloader_options, corruptions=["fog", "frost", "snow"])
     elif config['scenario'] == 'PORTRAITS':
-        scenario = shifts.PORTRAITS(dataloader_options, size=(32,32), train_ratio=0.8)
+        scenario = shifts.PORTRAITS(dataloader_options, test_dataloader_options, size=(32,32), train_ratio=0.8)
     elif config['scenario'] == 'OFFICEHOME':
-        scenario = shifts.OFFICEHOME(dataloader_options, size=(224,224))
+        scenario = shifts.OFFICEHOME(dataloader_options, test_dataloader_options, size=(224,224))
     else:
         raise Exception('Unknown scenario')
     scenario.source_dataloader = fabric.setup_dataloaders(scenario.source_dataloader)
@@ -165,9 +177,9 @@ def run_uda_experiments(fabric, config):
         model = utils.train_model_on_source(config, model, loss_fun, scenario, fabric)
     else:
         fabric.setup(model)
-    model.save_params()
     # Report initial performance of a loaded source-trained model
-    utils.report_acc(scenario, model, loss_fun)
+    utils.report_acc(scenario, model, loss_fun, config['report_source_train_risk'], config['report_target_train_risk'])
+    model.save_params()
     methods = get_methods(config, model, loss_fun, fabric)
     run_uda(config, methods, model, scenario, loss_fun, fabric)
 
@@ -210,35 +222,46 @@ if __name__ == "__main__":
     config = {
         # Experiment details
         'seed': 1,
-        'device': 'cpu', # or auto to find gpu automatically
+        'device': 'cpu', # 'cpu' or 'auto' to find gpu automatically
 
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
         'model': 'MLP',
         'resnet_size': 18, # 18 or 50
-        'pretrain': False,
-        'num_pretrain_epochs': 1, # if pretrain is True
-        'loss': EuclideanLoss(), # nn.CrossEntropyLoss()
-        'optimizer': 'adam', # alternative: sgd
+        'pretrain': True,
+        'num_pretrain_epochs': 2, # if pretrain is True
+        'loss': EuclideanLoss(),
+        'optimizer': 'adam', # alternatives: adam or sgd
         'learning_rate': 1e-3, # use 1e-4 for ResNets or a learning scheduler
         'momentum': 0.9, # for SGD
         'weight_decay': 0.0,
-        'num_epochs': 1,
 
         # Data loader options
-        'batch_size': 64,
-        'shuffle': False,
-        'drop_last': True,
+        'batch_size': 32,
 
         # Distribution shift scenario (MNIST_to_USPS, CIFAR10C, ...)
         'scenario': 'MNIST_to_USPS',
         'class_balanced': False,
 
-        # Algorithms to compare against
-        'algs': ['weighted_wrr'],
+        # Algorithms and their hyperparameters/options
+        'algs': ['wrr'], #, 'weighted_wrr'],
         'wrr_scale': 1.0,
         'wrr_norm': 1,
         'wrr_entropy_reg': 1e-4,
-        'wrr_debug': True,
+        'add_source_loss': True, # for weighted WRR
+        'num_epochs': 1,
+
+        # Debugging algorithms
+        'debug': True,
+        'print_every_n': 50,
+        'report_source_train_risk': False,
+        'report_target_train_risk': False,
+        'calc_entanglement': True,
+        'calc_margin': True,
+        'calc_grad_norms': True,
+
+        # Test set dataloader options
+        'test_batch_size': 512,
+        'checkpoint': False,
     }
 
     fabric = Fabric(accelerator=config['device'], devices="auto", strategy="auto")
