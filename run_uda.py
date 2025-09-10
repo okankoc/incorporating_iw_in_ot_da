@@ -13,7 +13,8 @@ from lightning import Fabric
 
 import utils
 import shifts
-from adapt import WRR, WWRR
+from adapt.wrr import WRR
+from adapt.weighted_wrr import WeightedWRR
 from models.conv import ConvNet, ConvNet2, LeNet, SmallCNN
 from models.mlp import MultiLayerPerceptron as MLP
 
@@ -43,35 +44,34 @@ class EuclideanLoss(nn.Module):
         return losses
 
 
-def get_methods(config, model, loss_fun, fabric):
+def init_algorithm(name, model, loss_fun, opt, fabric):
     # Prepare adaptation methods
-    methods = []
-    if 'wrr' in config['algs']:
-        methods.append(
-            WRR(
+    if name == 'wrr':
+        alg = WRR(
                 config,
                 fabric,
                 model,
-                loss_fun)
-        )
-    if 'weighted_wrr' in config['algs']:
-        methods.append(
-            WWRR(
+                loss_fun,
+                opt)
+    if name == 'weighted_wrr':
+        alg = WeightedWRR(
                 config,
                 fabric,
                 model,
-                loss_fun)
-        )
-    return methods
+                loss_fun,
+                opt)
+    return alg
 
 
-def run_uda(config, methods, model, scenario, loss_fun, fabric):
+def run_uda(config, model, scenario, loss_fun, fabric):
     # Run adaptation
-    for method in methods:
-        model.train()
+    methods = config['algs']
+    for method_name in methods:
+        opt = init_opt(config, model)
+        alg = init_algorithm(method_name, model, loss_fun, opt, fabric)
         print("===============================")
-        print(f"Method {method.name}")
-        # reset_all(seed=config['seed'])
+        print(f"Algorithm {alg.name}")
+        reset_all(seed=config['seed'])
         for epoch in range(config['num_epochs']):
             batch_idx = 0
             print(f"Epoch {epoch+1}")
@@ -79,13 +79,13 @@ def run_uda(config, methods, model, scenario, loss_fun, fabric):
                 y_train = utils.one_hot(y_train, scenario.num_classes)
                 if batch_idx % 10 == 0:
                     print(f"Batch id: {batch_idx}")
-                method.adapt(config, model, fabric, X_train, y_train, X_shift)
+                alg.adapt(config, model, fabric, X_train, y_train, X_shift)
                 if config['debug'] is True and (batch_idx % config['print_every_n'] == 0):
-                    debug_method(config, method, model, scenario, fabric)
+                    debug_method(config, alg, model, scenario, fabric)
                 batch_idx += 1
 
             print("===============================")
-            print(f"Method {method.name}")
+            print(f"Algorithm {alg.name}")
             utils.report_acc(scenario, model, loss_fun, config['report_source_train_risk'], config['report_target_train_risk'])
         model.restore_params()
 
@@ -125,6 +125,19 @@ def init_scenario(config, fabric):
     scenario.source_test_dataloader = fabric.setup_dataloaders(scenario.source_test_dataloader)
     scenario.target_test_dataloader = fabric.setup_dataloaders(scenario.target_test_dataloader)
     return scenario
+
+
+# For now we assume that all algorithms share the optimizer, but we can change that later
+def init_opt(config, model):
+    if config['optimizer'] == 'adam':
+        opt = torch.optim.Adam(model.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'])
+    elif config['optimizer'] == 'sgd':
+        opt = torch.optim.SGD(model.parameters(), lr=config['learning_rate'], momentum=config['momentum'], weight_decay=config['weight_decay'])
+    elif config['optimizer'] == 'sam':
+        opt = SAM(model.parameters(), torch.optim.Adam, rho=0.04, adaptive=True, lr=config['learning_rate'], weight_decay=config['weight_decay'])
+    else:
+        raise Exception('Unknown optimizer!')
+    return opt
 
 
 def init_model(config, scenario):
@@ -173,51 +186,20 @@ def run_uda_experiments(fabric, config):
     loss_fun = config['loss']
     scenario = init_scenario(config, fabric)
     model = init_model(config, scenario)
+    opt = init_opt(config, model)
     if config['pretrain'] is True:
-        model = utils.train_model_on_source(config, model, loss_fun, scenario, fabric)
+        model = utils.train_model_on_source(config, model, loss_fun, scenario, opt, fabric)
     else:
         fabric.setup(model)
     # Report initial performance of a loaded source-trained model
     utils.report_acc(scenario, model, loss_fun, config['report_source_train_risk'], config['report_target_train_risk'])
     model.save_params()
-    methods = get_methods(config, model, loss_fun, fabric)
-    run_uda(config, methods, model, scenario, loss_fun, fabric)
-
-
-def check_shared_support():
-    loss_fun = nn.CrossEntropyLoss()
-    device = "mps"
-    dataloader_options = {"batch_size": 64, "shuffle": False, "drop_last": True}
-    scenario = init_scenario(dataloader_options)
-    model = init_model(scenario, device)
-    model = utils.train_model_on_source(model, loss_fun, scenario, device, num_epochs=5)
-
-    # Compute weighted OT and note the difference!
-    num_batches_max = 5
-    batch_id = 0
-    for (X_train, y_train), (X_shift, y_shift) in zip(scenario.source_dataloader, scenario.target_dataloader):
-        X_train, X_shift, y_train, y_shift = (
-            X_train.to(device),
-            X_shift.to(device),
-            utils.one_hot(y_train.to(device), scenario.num_classes),
-            utils.one_hot(y_shift.to(device), scenario.num_classes),
-        )
-        f_source = model(X_train)
-        f_target = model(X_shift)
-        ot_loss = geomloss.SamplesLoss(loss="sinkhorn", p=2, blur=1e-4)
-        total_cost = ot_loss(f_source, f_target)
-        print(f"Standard OT with cost {total_cost} on batch {batch_id}")
-        # TODO: Reimplement this with explicit solution if needed!
-        compute_weighted_ot(f_source, f_target, p=2, blur=1e-4, device=device)
-
-        batch_id += 1
-        if batch_id == num_batches_max:
-            break
+    run_uda(config, model, scenario, loss_fun, fabric)
 
 
 if __name__ == "__main__":
     torch.set_default_dtype(torch.float32)
-    torch.set_printoptions(precision=4, sci_mode=False)
+    torch.set_printoptions(precision=2, sci_mode=False)
 
     config = {
         # Experiment details
@@ -230,24 +212,25 @@ if __name__ == "__main__":
         'pretrain': True,
         'num_pretrain_epochs': 2, # if pretrain is True
         'loss': EuclideanLoss(),
-        'optimizer': 'adam', # alternatives: adam or sgd
+        'optimizer': 'adam', # alternatives: adam, sgd, sam
         'learning_rate': 1e-3, # use 1e-4 for ResNets or a learning scheduler
         'momentum': 0.9, # for SGD
         'weight_decay': 0.0,
 
         # Data loader options
-        'batch_size': 32,
+        'batch_size': 64,
 
         # Distribution shift scenario (MNIST_to_USPS, CIFAR10C, ...)
         'scenario': 'MNIST_to_USPS',
         'class_balanced': False,
 
         # Algorithms and their hyperparameters/options
-        'algs': ['wrr'], #, 'weighted_wrr'],
+        'algs': ['wrr', 'weighted_wrr'],
         'wrr_scale': 1.0,
         'wrr_norm': 1,
         'wrr_entropy_reg': 1e-4,
         'add_source_loss': True, # for weighted WRR
+        'match_to_labels': False,
         'num_epochs': 1,
 
         # Debugging algorithms
@@ -255,9 +238,9 @@ if __name__ == "__main__":
         'print_every_n': 50,
         'report_source_train_risk': False,
         'report_target_train_risk': False,
-        'calc_entanglement': True,
-        'calc_margin': True,
-        'calc_grad_norms': True,
+        'calc_entanglement': True, # need to be disabled in cluster since OT library creates problems
+        'calc_margin': False,
+        'calc_grad_norms': False,
 
         # Test set dataloader options
         'test_batch_size': 512,
