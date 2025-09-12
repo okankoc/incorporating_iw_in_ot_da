@@ -18,6 +18,9 @@ import utils
 import shifts
 from adapt.wrr import WRR
 from adapt.weighted_wrr import WeightedWRR
+from adapt.oracle import Oracle
+from adapt.erm import ERM
+from adapt.debug import debug
 from models.conv import ConvNet, ConvNet2, LeNet, SmallCNN
 from models.mlp import MultiLayerPerceptron as MLP
 from sam import SAM
@@ -51,19 +54,13 @@ class EuclideanLoss(nn.Module):
 def init_algorithm(name, model, loss_fun, opt, fabric):
     # Prepare adaptation methods
     if name == 'wrr':
-        alg = WRR(
-                config,
-                fabric,
-                model,
-                loss_fun,
-                opt)
+        alg = WRR(config, fabric, model, loss_fun, opt)
     if name == 'weighted_wrr':
-        alg = WeightedWRR(
-                config,
-                fabric,
-                model,
-                loss_fun,
-                opt)
+        alg = WeightedWRR(config, fabric, model, loss_fun, opt)
+    if name == 'lje':
+        alg = Oracle(fabric, model, loss_fun, opt)
+    if name == 'erm':
+        alg = ERM(fabric, model, loss_fun, opt)
     return alg
 
 
@@ -81,11 +78,12 @@ def run_uda(config, model, scenario, loss_fun, fabric):
             print(f"Epoch {epoch+1}")
             for (X_train, y_train), (X_shift, y_shift) in zip(scenario.source_dataloader, scenario.target_dataloader):
                 y_train = utils.one_hot(y_train, scenario.num_classes)
+                y_shift = utils.one_hot(y_shift, scenario.num_classes)
                 if batch_idx % 10 == 0:
                     print(f"Batch id: {batch_idx}")
-                alg.adapt(config, model, fabric, X_train, y_train, X_shift)
+                alg.adapt(config, model, fabric, X_train, y_train, X_shift, y_shift)
                 if config['debug'] is True and (batch_idx % config['print_every_n'] == 0):
-                    debug_method(config, alg, model, scenario, fabric)
+                    debug_method(config, alg, model, loss_fun, scenario, fabric)
                 batch_idx += 1
 
             print("===============================")
@@ -94,11 +92,11 @@ def run_uda(config, model, scenario, loss_fun, fabric):
         model.restore_params()
 
 
-def debug_method(config, method, model, scenario, fabric):
+def debug_method(config, method, model, loss_fun, scenario, fabric):
     for (X_train, y_train), (X_shift, y_shift) in zip(scenario.source_test_dataloader, scenario.target_test_dataloader):
         y_train = utils.one_hot(y_train, scenario.num_classes)
         y_shift = utils.one_hot(y_shift, scenario.num_classes)
-        method.debug(config, model, fabric, X_train, y_train, X_shift, y_shift)
+        debug(config, model, loss_fun, fabric, X_train, y_train, X_shift, y_shift)
         if config['checkpoint'] is True:
             save_path = "save_files/" + scenario.name + "/" + model.name + "_" + method.name + "_checkpoint.pth"
             method.checkpoint(config, model, fabric, X_train, y_train, X_shift, save_path)
@@ -208,7 +206,7 @@ def run_uda_experiments(fabric, config):
     model = init_model(config, scenario)
     opt = init_opt(config, model)
     if config['pretrain'] is True:
-        if config['train_on_both'] is True:
+        if config['pretrain_on_both'] is True:
             print('========= DEBUG MODE ON: USING TARGET LABELS TO PRETRAIN LJE ORACLE MODEL =======')
             model = utils.train_model_on_source_and_target(config, model, loss_fun, scenario, opt, fabric)
         else:
@@ -229,10 +227,10 @@ if __name__ == "__main__":
     config = {
         # Experiment details
         'seed': 1,
-        'device': 'auto', # 'cpu' or 'auto' to find gpu automatically
+        'device': 'cpu', # 'cpu' or 'auto' to find gpu automatically
 
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        'model': 'ConvNet',
+        'model': 'MLP',
         'resnet_size': 18, # 18 or 50
         'pretrain': True,
         'num_pretrain_epochs': 10, # if pretrain is True
@@ -250,7 +248,7 @@ if __name__ == "__main__":
         'class_balanced': False,
 
         # Algorithms and their hyperparameters/options
-        'algs': ['wrr'],
+        'algs': ['lje'], # wrr, weighted_wrr, lje, erm
         'wrr_scale': 1.0,
         'wrr_norm': 1,
         'wrr_entropy_reg': 1e-4,
@@ -260,13 +258,13 @@ if __name__ == "__main__":
 
         # Debugging algorithms
         'debug': True,
-        'print_every_n': 10,
+        'print_every_n': 50,
         'report_source_train_risk': False,
         'report_target_train_risk': False,
         'calc_entanglement': True, # need to be disabled in cluster since OT library creates problems
-        'calc_margin': False,
+        'calc_margin': True,
         'calc_grad_norms': False,
-        'train_on_both': False,
+        'pretrain_on_both': False,
         'adapt_only_last_layer': False,
 
         # Test set dataloader options

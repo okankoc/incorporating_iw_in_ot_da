@@ -45,7 +45,7 @@ class WeightedWRR:
         return loss, ot_mat
 
 
-    def adapt(self, config, model, fabric, X_source, y_source, X_target):
+    def adapt(self, config, model, fabric, X_source, y_source, X_target, y_target=[]):
         self.opt.zero_grad()
         loss, _ = self.calc_loss(model, fabric, X_source, y_source, X_target)
         if self.add_source_loss is True:
@@ -81,33 +81,3 @@ class WeightedWRR:
             checkpoint = torch.load(save_path, weights_only=True)
             model.load_state_dict(checkpoint['model_state_dict'])
             self.opt.load_state_dict(checkpoint['optimizer_state_dict'])
-
-
-    def debug(self, config, model, fabric, X_source, y_source, X_target, y_target):
-        loss, ot_mat = self.calc_loss(model, fabric, X_source, y_source, X_target)
-
-        pred_source = model(X_source)
-        self.loss_fun.reduction = 'none'
-        losses = self.loss_fun(pred_source, y_source)
-        self.loss_fun.reduction = 'mean'
-        source_weights = torch.sum(ot_mat, dim=1)
-        weighted_source_loss = torch.sum(source_weights * losses)
-
-        print(f"Weighted WRR: {loss.item()}, weighted_source_loss: {weighted_source_loss.item()}")
-
-        if config['calc_entanglement'] == True:
-            entanglement = torch.sum(ot_mat * (torch.cdist(y_source, y_target) ** self.p))
-            print(f"Entanglement: {entanglement}")
-        if config['calc_margin'] == True:
-            # Get correct points with matching labels
-            # Find the gap between max and second max (by sorting for now)
-            pred_sorted_val, pred_sorted_ind = torch.sort(pred_source, dim=1, descending=True)
-            correct = (pred_sorted_ind[:, 0] == y_source.argmax(1))
-            margin = pred_sorted_val[correct, 0] - pred_sorted_val[correct, 1]
-            std_margin, avg_margin = torch.std_mean(margin)
-            print(f"Margin mean: {avg_margin}, std: {std_margin}")
-        if config['calc_grad_norms'] == True:
-            grad_norms = []
-            for w in model.parameters():
-                 grad_norms.append(torch.linalg.vector_norm(w.grad, ord=2, dim=None).item())
-            print(f"Grad norms: {grad_norms}")
