@@ -18,9 +18,10 @@ import utils
 import shifts
 from adapt.wrr import WRR
 from adapt.weighted_wrr import WeightedWRR
+from adapt.constrained_wrr import ConstrainedWRR
 from adapt.oracle import Oracle
 from adapt.erm import ERM
-from adapt.debug import debug
+from adapt.debug import debug_model
 from models.conv import ConvNet, ConvNet2, LeNet, SmallCNN
 from models.mlp import MultiLayerPerceptron as MLP
 from sam import SAM
@@ -57,6 +58,8 @@ def init_algorithm(name, model, loss_fun, opt, fabric):
         alg = WRR(config, fabric, model, loss_fun, opt)
     if name == 'weighted_wrr':
         alg = WeightedWRR(config, fabric, model, loss_fun, opt)
+    if name == 'cons_wrr':
+        alg = ConstrainedWRR(config, fabric, model, loss_fun, opt)
     if name == 'lje':
         alg = Oracle(fabric, model, loss_fun, opt)
     if name == 'erm':
@@ -83,7 +86,7 @@ def run_uda(config, model, scenario, loss_fun, fabric):
                     print(f"Batch id: {batch_idx}")
                 alg.adapt(config, model, fabric, X_train, y_train, X_shift, y_shift)
                 if config['debug'] is True and (batch_idx % config['print_every_n'] == 0):
-                    debug_method(config, alg, model, loss_fun, scenario, fabric)
+                    debug_method(config, alg, model, loss_fun, scenario, fabric, batch_idx / config['print_every_n'])
                 batch_idx += 1
 
             print("===============================")
@@ -92,15 +95,23 @@ def run_uda(config, model, scenario, loss_fun, fabric):
         model.restore_params()
 
 
-def debug_method(config, method, model, loss_fun, scenario, fabric):
+def debug_method(config, method, model, loss_fun, scenario, fabric, idx_des):
+    num_batches = len(scenario.source_test_dataloader.dataset) / config['test_batch_size']
+    idx_des = idx_des % num_batches
+    idx = 0
     for (X_train, y_train), (X_shift, y_shift) in zip(scenario.source_test_dataloader, scenario.target_test_dataloader):
-        y_train = utils.one_hot(y_train, scenario.num_classes)
-        y_shift = utils.one_hot(y_shift, scenario.num_classes)
-        debug(config, model, loss_fun, fabric, X_train, y_train, X_shift, y_shift)
-        if config['checkpoint'] is True:
-            save_path = "save_files/" + scenario.name + "/" + model.name + "_" + method.name + "_checkpoint.pth"
-            method.checkpoint(config, model, fabric, X_train, y_train, X_shift, save_path)
-        break
+        if idx == idx_des:
+            print(f"Debugging/validating on {idx}'th test bach")
+            y_train = utils.one_hot(y_train, scenario.num_classes)
+            y_shift = utils.one_hot(y_shift, scenario.num_classes)
+            debug_model(config, model, loss_fun, fabric, X_train, y_train, X_shift, y_shift)
+            if config['validate'] is True:
+                method.validate(config, model, fabric, X_train, y_train, X_shift)
+            if config['checkpoint'] is True:
+                save_path = "save_files/" + scenario.name + "/" + model.name + "_" + method.name + "_checkpoint.pth"
+                method.checkpoint(config, model, fabric, X_train, y_train, X_shift, save_path)
+            break
+        idx += 1
 
 
 def init_scenario(config, fabric):
@@ -227,10 +238,10 @@ if __name__ == "__main__":
     config = {
         # Experiment details
         'seed': 1,
-        'device': 'cpu', # 'cpu' or 'auto' to find gpu automatically
+        'device': 'auto', # 'cpu' or 'auto' to find gpu automatically
 
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        'model': 'MLP',
+        'model': 'ConvNet',
         'resnet_size': 18, # 18 or 50
         'pretrain': True,
         'num_pretrain_epochs': 10, # if pretrain is True
@@ -248,10 +259,11 @@ if __name__ == "__main__":
         'class_balanced': False,
 
         # Algorithms and their hyperparameters/options
-        'algs': ['lje'], # wrr, weighted_wrr, lje, erm
+        'algs': ['cons_wrr'], # wrr, weighted_wrr, cons_wrr, lje, erm
         'wrr_scale': 1.0,
-        'wrr_norm': 1,
-        'wrr_entropy_reg': 1e-4,
+        'wrr_norm': 2, # when minimizing only the OT-cost, p=1 creates errors in geomloss,
+        'wrr_entropy_reg': 5e-2,
+        'wrr_thresh': 0.05,
         'add_source_loss': True, # for weighted WRR
         'match_to_labels': False,
         'num_epochs': 2,
@@ -262,7 +274,7 @@ if __name__ == "__main__":
         'report_source_train_risk': False,
         'report_target_train_risk': False,
         'calc_entanglement': True, # need to be disabled in cluster since OT library creates problems
-        'calc_margin': True,
+        'calc_margin': False,
         'calc_grad_norms': False,
         'pretrain_on_both': False,
         'adapt_only_last_layer': False,
@@ -270,6 +282,7 @@ if __name__ == "__main__":
         # Test set dataloader options
         'test_batch_size': 512,
         'checkpoint': False,
+        'validate': True,
     }
 
     fabric = Fabric(accelerator=config['device'], devices="auto", strategy="auto")

@@ -72,7 +72,7 @@ class WRR:
             pred_target = model(X_target)
             source_loss = self.loss_fun(pred_source, y_source)
             ot_cost = self.calc_ot(pred_source, pred_target, y_source)
-            loss = source_loss + self.scale * ot_cost
+            loss = self.scale * source_loss + ot_cost
             fabric.backward(loss)
             self.opt.step()
 
