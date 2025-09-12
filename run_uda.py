@@ -11,12 +11,16 @@ import matplotlib
 import matplotlib.pyplot as plt
 from lightning import Fabric
 
+import torch_optimizer
+import kfac.preconditioner
+
 import utils
 import shifts
 from adapt.wrr import WRR
 from adapt.weighted_wrr import WeightedWRR
 from models.conv import ConvNet, ConvNet2, LeNet, SmallCNN
 from models.mlp import MultiLayerPerceptron as MLP
+from sam import SAM
 
 
 def reset_all(seed):
@@ -135,6 +139,16 @@ def init_opt(config, model):
         opt = torch.optim.SGD(model.parameters(), lr=config['learning_rate'], momentum=config['momentum'], weight_decay=config['weight_decay'])
     elif config['optimizer'] == 'sam':
         opt = SAM(model.parameters(), torch.optim.Adam, rho=0.04, adaptive=True, lr=config['learning_rate'], weight_decay=config['weight_decay'])
+    elif config['optimizer'] == 'lookahead':
+        base_opt = torch.optim.Adam(model.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'])
+        opt = torch_optimizer.Lookahead(base_opt, k=5, alpha=0.5)
+    elif config['optimizer'] == 'adahessian':
+        # All backward calls need to have create_graph=True
+        opt = torch_optimizer.Adahessian(model.parameters(), lr=0.15, weight_decay=0.0)
+    elif config['optimizer'] == 'kfac':
+        # TODO: Does not work for conv models!
+        opt = torch.optim.SGD(model.parameters(), lr=config['learning_rate'], momentum=config['momentum'], weight_decay=config['weight_decay'])
+        config['pre'] = kfac.preconditioner.KFACPreconditioner(model, factor_update_steps=1, inv_update_steps=1)
     else:
         raise Exception('Unknown optimizer!')
     return opt
@@ -153,6 +167,12 @@ def init_model(config, scenario):
         model = SmallCNN(num_classes=scenario.num_classes)
     elif config['model'] == 'ResNet':
         model = init_resnet(config['resnet_size'], scenario.num_classes)
+
+    if config['adapt_only_last_layer'] == True:
+        num_layers = len(list(model.parameters()))
+        for i, p in enumerate(model.parameters()):
+            if i < num_layers - 1:
+                p.requires_grad = False
     return model
 
 
@@ -188,12 +208,17 @@ def run_uda_experiments(fabric, config):
     model = init_model(config, scenario)
     opt = init_opt(config, model)
     if config['pretrain'] is True:
-        model = utils.train_model_on_source(config, model, loss_fun, scenario, opt, fabric)
+        if config['train_on_both'] is True:
+            print('========= DEBUG MODE ON: USING TARGET LABELS TO PRETRAIN LJE ORACLE MODEL =======')
+            model = utils.train_model_on_source_and_target(config, model, loss_fun, scenario, opt, fabric)
+        else:
+            model = utils.train_model_on_source(config, model, loss_fun, scenario, opt, fabric)
     else:
         fabric.setup(model)
     # Report initial performance of a loaded source-trained model
     utils.report_acc(scenario, model, loss_fun, config['report_source_train_risk'], config['report_target_train_risk'])
     model.save_params()
+    model.train()
     run_uda(config, model, scenario, loss_fun, fabric)
 
 
@@ -204,15 +229,15 @@ if __name__ == "__main__":
     config = {
         # Experiment details
         'seed': 1,
-        'device': 'cpu', # 'cpu' or 'auto' to find gpu automatically
+        'device': 'auto', # 'cpu' or 'auto' to find gpu automatically
 
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        'model': 'MLP',
+        'model': 'ConvNet',
         'resnet_size': 18, # 18 or 50
         'pretrain': True,
-        'num_pretrain_epochs': 2, # if pretrain is True
+        'num_pretrain_epochs': 10, # if pretrain is True
         'loss': EuclideanLoss(),
-        'optimizer': 'adam', # alternatives: adam, sgd, sam
+        'optimizer': 'adam', # alternatives: adam, sgd, sam, ...
         'learning_rate': 1e-3, # use 1e-4 for ResNets or a learning scheduler
         'momentum': 0.9, # for SGD
         'weight_decay': 0.0,
@@ -225,22 +250,24 @@ if __name__ == "__main__":
         'class_balanced': False,
 
         # Algorithms and their hyperparameters/options
-        'algs': ['wrr', 'weighted_wrr'],
+        'algs': ['wrr'],
         'wrr_scale': 1.0,
         'wrr_norm': 1,
         'wrr_entropy_reg': 1e-4,
         'add_source_loss': True, # for weighted WRR
         'match_to_labels': False,
-        'num_epochs': 1,
+        'num_epochs': 2,
 
         # Debugging algorithms
         'debug': True,
-        'print_every_n': 50,
+        'print_every_n': 10,
         'report_source_train_risk': False,
         'report_target_train_risk': False,
         'calc_entanglement': True, # need to be disabled in cluster since OT library creates problems
         'calc_margin': False,
         'calc_grad_norms': False,
+        'train_on_both': False,
+        'adapt_only_last_layer': False,
 
         # Test set dataloader options
         'test_batch_size': 512,

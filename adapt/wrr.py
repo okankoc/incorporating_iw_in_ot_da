@@ -10,8 +10,6 @@ import geomloss
 import copy
 import ot      # We don't need POT if we don't need to compute entanglement!
 
-from sam import SAM
-
 # Wasserstein Marginal Distance regularized source risk minimization using model outputs
 class WRR:
     def __init__(self, config, fabric, model, loss_fun, opt):
@@ -40,16 +38,16 @@ class WRR:
 
 
     def adapt(self, config, model, fabric, X_source, y_source, X_target):
-        self.opt.zero_grad()
-        pred_source = model(X_source)
-        pred_target = model(X_target)
-        source_loss = self.loss_fun(pred_source, y_source)
-        ot_cost = self.calc_ot(pred_source, pred_target, y_source)
-        self.loss = source_loss + self.scale * ot_cost
-        fabric.backward(self.loss)
-        closure = None
         if config['optimizer'] == 'sam':
+            self.opt.zero_grad()
+            pred_source = model(X_source)
+            pred_target = model(X_target)
+            source_loss = self.loss_fun(pred_source, y_source)
+            ot_cost = self.calc_ot(pred_source, pred_target, y_source)
+            self.loss = source_loss + self.scale * ot_cost
+            fabric.backward(self.loss)
             def closure():
+                self.opt.zero_grad()
                 pred_source = model(X_source)
                 pred_target = model(X_target)
                 source_loss = self.loss_fun(pred_source, y_source)
@@ -57,7 +55,26 @@ class WRR:
                 loss = source_loss + self.scale * ot_cost
                 fabric.backward(loss)
                 return loss
-        self.opt.step(closure)
+            self.opt.step(closure)
+        elif config['optimizer'] == 'kfac':
+            self.opt.zero_grad()
+            pred_source = model(X_source)
+            pred_target = model(X_target)
+            source_loss = self.loss_fun(pred_source, y_source)
+            ot_cost = self.calc_ot(pred_source, pred_target, y_source)
+            self.loss = source_loss + self.scale * ot_cost
+            fabric.backward(self.loss)
+            config['pre'].step() # this is a bit of a hack for now
+            self.opt.step()
+        else:
+            self.opt.zero_grad()
+            pred_source = model(X_source)
+            pred_target = model(X_target)
+            source_loss = self.loss_fun(pred_source, y_source)
+            ot_cost = self.calc_ot(pred_source, pred_target, y_source)
+            self.loss = source_loss + self.scale * ot_cost
+            fabric.backward(self.loss)
+            self.opt.step()
 
 
     def checkpoint(self, config, model, fabric, X_source, y_source, X_target, save_path):

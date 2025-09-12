@@ -10,8 +10,6 @@ import geomloss
 import copy
 import ot      # We don't need POT if we don't need to compute entanglement!
 
-from sam import SAM
-
 # Weighted Wassertein regularized risk
 class WeightedWRR:
     def __init__(self, config, fabric, model, loss_fun, opt):

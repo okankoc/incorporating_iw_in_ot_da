@@ -60,27 +60,32 @@ class ConvNet2(nn.Module):
 
 
 class ConvNet(nn.Module):
-    def __init__(self, num_classes):
+    def __init__(self, num_classes, use_maxpool=True):
         super().__init__()
         self.num_classes = num_classes
-        self.name = "conv1"
         self.features = []
         self.net = nn.Sequential()
+        if use_maxpool is True:
+            self.name = "conv1_max"
+            pool_fun = nn.MaxPool2d(kernel_size=2, stride=2)
+        else:
+            self.name = "conv1_avg"
+            pool_fun = nn.AvgPool2d(kernel_size=2, stride=2)
         self.net.add_module("conv1", nn.LazyConv2d(32, kernel_size=3, stride=1, padding="same"))
         self.net.add_module("relu1", nn.ReLU(True))
         self.net.add_module("conv2", nn.Conv2d(32, 32, kernel_size=3, stride=1, padding="same"))
         self.net.add_module("relu2", nn.ReLU(True))
-        self.net.add_module("pool1", nn.MaxPool2d(kernel_size=2, stride=2))
+        self.net.add_module("pool1", pool_fun)
         self.net.add_module("conv3", nn.Conv2d(32, 64, kernel_size=3, stride=1, padding="same"))
         self.net.add_module("relu3", nn.ReLU(True))
         self.net.add_module("conv4", nn.Conv2d(64, 64, kernel_size=3, stride=1, padding="same"))
         self.net.add_module("relu4", nn.ReLU(True))
-        self.net.add_module("pool2", nn.MaxPool2d(kernel_size=2, stride=2))
+        self.net.add_module("pool2", pool_fun)
         self.net.add_module("conv5", nn.Conv2d(64, 128, kernel_size=3, stride=1, padding="same"))
         self.net.add_module("relu5", nn.ReLU(True))
         self.net.add_module("conv6", nn.Conv2d(128, 128, kernel_size=3, stride=1, padding="same"))
         self.net.add_module("relu6", nn.ReLU(True))
-        self.net.add_module("pool3", nn.MaxPool2d(kernel_size=2, stride=2))
+        self.net.add_module("pool3", pool_fun)
         self.net.add_module("flatten", nn.Flatten())
         self.net.add_module("fc1", nn.LazyLinear(128))
         self.net.add_module("last_features", nn.ReLU())

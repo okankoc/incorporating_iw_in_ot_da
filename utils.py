@@ -71,6 +71,35 @@ def train_model_on_source(config, model, loss_fun, scenario, opt, fabric):
     return model
 
 
+# Checks that the same network architecture used for both source *and* target can achieve high accuracy
+def train_model_on_source_and_target(config, model, loss_fun, scenario, opt, fabric):
+    save_path = "save_files/" + scenario.name + "/train_on_both/" + model.name + ".pth"
+    try:
+        # Load parameters from a file
+        model.load_state_dict(torch.load(save_path, weights_only=True))
+        fabric.setup(model)
+        log.info(f"Saved model found! Loading parameters from file: {save_path}")
+    except:
+        log.info(f"Save file {save_path} not found. Training from scratch...")
+        combined_data = torch.utils.data.ConcatDataset([scenario.source_data, scenario.target_data])
+        dataloader = torch.utils.data.DataLoader(combined_data, **scenario.dataloader_options)
+        fabric.setup(model, opt)
+        train(
+            dataloader,
+            model,
+            loss_fun,
+            opt,
+            config['num_pretrain_epochs'],
+            fabric,
+            report_every=10,
+        )
+        # Report accuracy/loss on whole training dataset
+        test(scenario.source_dataloader, model, loss_fun)
+        log.info(f"Saving parameters to file: {save_path}")
+        torch.save(model.state_dict(), save_path)
+    return model
+
+
 def train(dataloader, model, loss_fun, optimizer, num_epochs, fabric, report_every=1, report_acc=True):
     size = len(dataloader.dataset)
     t0 = time.perf_counter()
