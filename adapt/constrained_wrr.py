@@ -25,21 +25,25 @@ class ConstrainedWRR:
 
     def adapt(self, config, model, fabric, X_source, y_source, X_target, y_target=[]):
 
-        # STRATEGY 1: SWITCH BETWEEN MINIMIZING OT COST AND SOURCE LOSS
         self.opt.zero_grad()
         pred_source = model(X_source)
         pred_target = model(X_target)
         ot_cost = self.calc_ot(pred_source, pred_target)
 
         if self.mode == 0:
-            fabric.backward(ot_cost)
+            loss = ot_cost
+            fabric.backward(loss)
         else:
             source_loss = self.loss_fun(pred_source, y_source)
             loss = source_loss + self.scale * ot_cost
             fabric.backward(loss)
-        self.opt.step()
+        if config['optimizer'] == 'dfw':
+            self.opt.step(lambda: float(loss))
+        else:
+            self.opt.step()
 
 
+    @torch.no_grad()
     def validate(self, config, model, fabric, X_source, y_source, X_target):
         pred_source = model(X_source)
         pred_target = model(X_target)
@@ -47,5 +51,7 @@ class ConstrainedWRR:
 
         if ot_cost > self.thresh:
             self.mode = 0 # minimize OT
+            print("Constraint threshold exceeded. Minimizing constraint")
         else:
             self.mode = 1 # minimize scaled WRR
+            print(f"Constraint threshold satisfied. Minimizing WRR with scale {config['wrr_scale']}")

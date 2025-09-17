@@ -11,18 +11,25 @@ import matplotlib
 import matplotlib.pyplot as plt
 from lightning import Fabric
 
+# 3rd party libraries
 import torch_optimizer
 import kfac.preconditioner
+from dfw import DFW
 
+# Code from this repo
 import utils
 import shifts
+from loss import MarginLoss, EuclideanLoss
 from adapt.wrr import WRR
 from adapt.weighted_wrr import WeightedWRR
 from adapt.constrained_wrr import ConstrainedWRR
 from adapt.oracle import Oracle
 from adapt.erm import ERM
+from adapt.dann import DANN
+from adapt.fdal import FDAL
+from adapt.reverse_kl import ReverseKL
 from adapt.debug import debug_model
-from models.conv import ConvNet, ConvNet2, LeNet, SmallCNN
+from models.conv import ConvNet, ConvNet2, LeNet, SmallCNN, ConvDomainClassifier
 from models.mlp import MultiLayerPerceptron as MLP
 from sam import SAM
 
@@ -40,19 +47,7 @@ def reset_all(seed):
     torch.backends.cudnn.benchmark = False
 
 
-class EuclideanLoss(nn.Module):
-    def __init__(self):
-        super(EuclideanLoss, self).__init__()
-        self.reduction = 'mean'
-
-    def forward(self, x, y):
-        losses = torch.sqrt(torch.sum((x - y) ** 2, dim=1))
-        if self.reduction == 'mean':
-            return torch.mean(losses)
-        return losses
-
-
-def init_algorithm(name, model, loss_fun, opt, fabric):
+def init_algorithm(config, name, model, loss_fun, opt, fabric):
     # Prepare adaptation methods
     if name == 'wrr':
         alg = WRR(config, fabric, model, loss_fun, opt)
@@ -64,6 +59,12 @@ def init_algorithm(name, model, loss_fun, opt, fabric):
         alg = Oracle(fabric, model, loss_fun, opt)
     if name == 'erm':
         alg = ERM(fabric, model, loss_fun, opt)
+    if name == 'dann':
+        alg = DANN(config, fabric, model, loss_fun, opt)
+    if name == 'fdal':
+        alg = FDAL(config, fabric, model, loss_fun, opt)
+    if name == 'reverse-kl':
+        alg = ReverseKL(config, fabric, model, loss_fun, opt, alpha_reverse=0.1, alpha_forward=0.1, augment_softmax=0.0)
     return alg
 
 
@@ -72,7 +73,7 @@ def run_uda(config, model, scenario, loss_fun, fabric):
     methods = config['algs']
     for method_name in methods:
         opt = init_opt(config, model)
-        alg = init_algorithm(method_name, model, loss_fun, opt, fabric)
+        alg = init_algorithm(config, method_name, model, loss_fun, opt, fabric)
         print("===============================")
         print(f"Algorithm {alg.name}")
         reset_all(seed=config['seed'])
@@ -158,6 +159,8 @@ def init_opt(config, model):
         # TODO: Does not work for conv models!
         opt = torch.optim.SGD(model.parameters(), lr=config['learning_rate'], momentum=config['momentum'], weight_decay=config['weight_decay'])
         config['pre'] = kfac.preconditioner.KFACPreconditioner(model, factor_update_steps=1, inv_update_steps=1)
+    elif config['optimizer'] == 'dfw':
+        opt = DFW(model.parameters(), eta=0.1)
     else:
         raise Exception('Unknown optimizer!')
     return opt
@@ -237,7 +240,7 @@ if __name__ == "__main__":
 
     config = {
         # Experiment details
-        'seed': 1,
+        'seed': 2,
         'device': 'auto', # 'cpu' or 'auto' to find gpu automatically
 
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
@@ -245,11 +248,11 @@ if __name__ == "__main__":
         'resnet_size': 18, # 18 or 50
         'pretrain': True,
         'num_pretrain_epochs': 10, # if pretrain is True
-        'loss': EuclideanLoss(),
-        'optimizer': 'adam', # alternatives: adam, sgd, sam, ...
+        'loss': MarginLoss(), #MarginLoss(), EuclideanLoss(), nn.CrossEntropyLoss(),
+        'optimizer': 'adam', # alternatives: adam, sgd, sam, dfw, kfac
         'learning_rate': 1e-3, # use 1e-4 for ResNets or a learning scheduler
         'momentum': 0.9, # for SGD
-        'weight_decay': 0.0,
+        'weight_decay': 0.01,
 
         # Data loader options
         'batch_size': 64,
@@ -259,14 +262,15 @@ if __name__ == "__main__":
         'class_balanced': False,
 
         # Algorithms and their hyperparameters/options
-        'algs': ['cons_wrr'], # wrr, weighted_wrr, cons_wrr, lje, erm
+        'algs': ['reverse-kl'], # wrr, weighted_wrr, cons_wrr, lje, erm, dann, fdal, reverse-kl
         'wrr_scale': 1.0,
         'wrr_norm': 2, # when minimizing only the OT-cost, p=1 creates errors in geomloss,
         'wrr_entropy_reg': 5e-2,
-        'wrr_thresh': 0.05,
+        'wrr_thresh': 0.01, # for constrained WRR
         'add_source_loss': True, # for weighted WRR
         'match_to_labels': False,
-        'num_epochs': 2,
+        'num_epochs': 5,
+        'num_steps': 1, # normally this is one, if it is more than one, we print the loss values
 
         # Debugging algorithms
         'debug': True,
@@ -274,9 +278,9 @@ if __name__ == "__main__":
         'report_source_train_risk': False,
         'report_target_train_risk': False,
         'calc_entanglement': True, # need to be disabled in cluster since OT library creates problems
-        'calc_margin': False,
+        'calc_margin': True,
         'calc_grad_norms': False,
-        'pretrain_on_both': False,
+        'pretrain_on_both': False, # starting from a model that 'cheats'!
         'adapt_only_last_layer': False,
 
         # Test set dataloader options

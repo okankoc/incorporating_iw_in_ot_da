@@ -38,15 +38,8 @@ class WRR:
 
 
     def adapt(self, config, model, fabric, X_source, y_source, X_target, y_target=[]):
-        if config['optimizer'] == 'sam':
-            self.opt.zero_grad()
-            pred_source = model(X_source)
-            pred_target = model(X_target)
-            source_loss = self.loss_fun(pred_source, y_source)
-            ot_cost = self.calc_ot(pred_source, pred_target, y_source)
-            loss = source_loss + self.scale * ot_cost
-            fabric.backward(loss)
-            def closure():
+        for i in range(config['num_steps']):
+            if config['optimizer'] == 'sam':
                 self.opt.zero_grad()
                 pred_source = model(X_source)
                 pred_target = model(X_target)
@@ -54,27 +47,49 @@ class WRR:
                 ot_cost = self.calc_ot(pred_source, pred_target, y_source)
                 loss = source_loss + self.scale * ot_cost
                 fabric.backward(loss)
-                return loss
-            self.opt.step(closure)
-        elif config['optimizer'] == 'kfac':
-            self.opt.zero_grad()
-            pred_source = model(X_source)
-            pred_target = model(X_target)
-            source_loss = self.loss_fun(pred_source, y_source)
-            ot_cost = self.calc_ot(pred_source, pred_target, y_source)
-            loss = source_loss + self.scale * ot_cost
-            fabric.backward(loss)
-            config['pre'].step() # this is a bit of a hack for now
-            self.opt.step()
-        else:
-            self.opt.zero_grad()
-            pred_source = model(X_source)
-            pred_target = model(X_target)
-            source_loss = self.loss_fun(pred_source, y_source)
-            ot_cost = self.calc_ot(pred_source, pred_target, y_source)
-            loss = self.scale * source_loss + ot_cost
-            fabric.backward(loss)
-            self.opt.step()
+                def closure():
+                    self.opt.zero_grad()
+                    pred_source = model(X_source)
+                    pred_target = model(X_target)
+                    source_loss = self.loss_fun(pred_source, y_source)
+                    ot_cost = self.calc_ot(pred_source, pred_target, y_source)
+                    loss = source_loss + self.scale * ot_cost
+                    fabric.backward(loss)
+                    return loss
+                self.opt.step(closure)
+            elif config['optimizer'] == 'kfac':
+                self.opt.zero_grad()
+                pred_source = model(X_source)
+                pred_target = model(X_target)
+                source_loss = self.loss_fun(pred_source, y_source)
+                ot_cost = self.calc_ot(pred_source, pred_target, y_source)
+                loss = source_loss + self.scale * ot_cost
+                fabric.backward(loss)
+                config['pre'].step() # this is a bit of a hack for now
+                self.opt.step()
+            elif config['optimizer'] == 'dfw':
+                self.opt.zero_grad()
+                pred_source = model(X_source)
+                pred_target = model(X_target)
+                source_loss = self.loss_fun(pred_source, y_source)
+                ot_cost = self.calc_ot(pred_source, pred_target, y_source)
+                loss = self.scale * source_loss + ot_cost
+                fabric.backward(loss)
+                self.opt.step(lambda: float(loss))
+            else:
+                self.opt.zero_grad()
+                pred_source = model(X_source)
+                pred_target = model(X_target)
+                source_loss = self.loss_fun(pred_source, y_source)
+                ot_cost = self.calc_ot(pred_source, pred_target, y_source)
+                loss = self.scale * source_loss + ot_cost
+                fabric.backward(loss)
+                self.opt.step()
+            # print(f"WRR loss at step {i}: {loss}")
+
+
+    def validate(self, config, model, fabric, X_source, y_source, X_target):
+        pass
 
 
     def checkpoint(self, config, model, fabric, X_source, y_source, X_target, save_path):
