@@ -11,11 +11,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 from lightning import Fabric
 
-# 3rd party libraries
-import torch_optimizer
-import kfac.preconditioner
-from dfw import DFW
-
 # Code from this repo
 import utils
 import shifts
@@ -31,7 +26,6 @@ from adapt.reverse_kl import ReverseKL
 from adapt.debug import debug_model
 from models.conv import ConvNet, ConvNet2, LeNet, SmallCNN, ConvDomainClassifier
 from models.mlp import MultiLayerPerceptron as MLP
-from sam import SAM
 
 
 def reset_all(seed):
@@ -102,16 +96,15 @@ def debug_method(config, method, model, loss_fun, scenario, fabric, idx_des):
     idx = 0
     for (X_train, y_train), (X_shift, y_shift) in zip(scenario.source_test_dataloader, scenario.target_test_dataloader):
         if idx == idx_des:
-            print(f"Debugging/validating on {idx}'th test bach")
+            print("============================================")
+            print(f"Debugging/validating on {idx}'th test batch")
             y_train = utils.one_hot(y_train, scenario.num_classes)
             y_shift = utils.one_hot(y_shift, scenario.num_classes)
             debug_model(config, model, loss_fun, fabric, X_train, y_train, X_shift, y_shift)
             if config['validate'] is True:
                 method.validate(config, model, fabric, X_train, y_train, X_shift)
-            if config['checkpoint'] is True:
-                save_path = "save_files/" + scenario.name + "/" + model.name + "_" + method.name + "_checkpoint.pth"
-                method.checkpoint(config, model, fabric, X_train, y_train, X_shift, save_path)
             break
+            print("============================================")
         idx += 1
 
 
@@ -147,20 +140,6 @@ def init_opt(config, model):
         opt = torch.optim.Adam(model.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'])
     elif config['optimizer'] == 'sgd':
         opt = torch.optim.SGD(model.parameters(), lr=config['learning_rate'], momentum=config['momentum'], weight_decay=config['weight_decay'])
-    elif config['optimizer'] == 'sam':
-        opt = SAM(model.parameters(), torch.optim.Adam, rho=0.04, adaptive=True, lr=config['learning_rate'], weight_decay=config['weight_decay'])
-    elif config['optimizer'] == 'lookahead':
-        base_opt = torch.optim.Adam(model.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'])
-        opt = torch_optimizer.Lookahead(base_opt, k=5, alpha=0.5)
-    elif config['optimizer'] == 'adahessian':
-        # All backward calls need to have create_graph=True
-        opt = torch_optimizer.Adahessian(model.parameters(), lr=0.15, weight_decay=0.0)
-    elif config['optimizer'] == 'kfac':
-        # TODO: Does not work for conv models!
-        opt = torch.optim.SGD(model.parameters(), lr=config['learning_rate'], momentum=config['momentum'], weight_decay=config['weight_decay'])
-        config['pre'] = kfac.preconditioner.KFACPreconditioner(model, factor_update_steps=1, inv_update_steps=1)
-    elif config['optimizer'] == 'dfw':
-        opt = DFW(model.parameters(), eta=0.1)
     else:
         raise Exception('Unknown optimizer!')
     return opt
@@ -237,19 +216,20 @@ def run_uda_experiments(fabric, config):
 if __name__ == "__main__":
     torch.set_default_dtype(torch.float32)
     torch.set_printoptions(precision=2, sci_mode=False)
+    # torch.autograd.set_detect_anomaly(True)
 
     config = {
         # Experiment details
         'seed': 2,
-        'device': 'auto', # 'cpu' or 'auto' to find gpu automatically
+        'device': 'cpu', # 'cpu' or 'auto' to find gpu automatically
 
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        'model': 'ConvNet',
+        'model': 'MLP',
         'resnet_size': 18, # 18 or 50
         'pretrain': True,
-        'num_pretrain_epochs': 10, # if pretrain is True
+        'num_pretrain_epochs': 5, # if pretrain is True
         'loss': MarginLoss(), #MarginLoss(), EuclideanLoss(), nn.CrossEntropyLoss(),
-        'optimizer': 'adam', # alternatives: adam, sgd, sam, dfw, kfac
+        'optimizer': 'adam', # alternatives: adam, sgd
         'learning_rate': 1e-3, # use 1e-4 for ResNets or a learning scheduler
         'momentum': 0.9, # for SGD
         'weight_decay': 0.01,
@@ -262,24 +242,27 @@ if __name__ == "__main__":
         'class_balanced': False,
 
         # Algorithms and their hyperparameters/options
-        'algs': ['reverse-kl'], # wrr, weighted_wrr, cons_wrr, lje, erm, dann, fdal, reverse-kl
+        'algs': ['wrr'], # wrr, weighted_wrr, cons_wrr, lje, erm, dann, fdal, reverse-kl
         'wrr_scale': 1.0,
-        'wrr_norm': 2, # when minimizing only the OT-cost, p=1 creates errors in geomloss,
-        'wrr_entropy_reg': 5e-2,
+        'wrr_norm': 1, # only for wrr, not clear how to use p = 2 for weighted OT
+        'wrr_entropy_reg': 1e-4,
         'wrr_thresh': 0.01, # for constrained WRR
         'add_source_loss': True, # for weighted WRR
         'match_to_labels': False,
-        'num_epochs': 5,
+        'num_epochs': 2,
         'num_steps': 1, # normally this is one, if it is more than one, we print the loss values
 
         # Debugging algorithms
         'debug': True,
+        'print_during_opt': False,
         'print_every_n': 50,
         'report_source_train_risk': False,
         'report_target_train_risk': False,
-        'calc_entanglement': True, # need to be disabled in cluster since OT library creates problems
-        'calc_margin': True,
-        'calc_grad_norms': False,
+        'calc_entanglement': False,
+        'calc_margin': False,
+        'calc_wrr': True,
+        'calc_weighted_wrr': False,
+        'calc_grad_info': True,
         'pretrain_on_both': False, # starting from a model that 'cheats'!
         'adapt_only_last_layer': False,
 

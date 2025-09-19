@@ -38,78 +38,17 @@ class WRR:
 
 
     def adapt(self, config, model, fabric, X_source, y_source, X_target, y_target=[]):
-        for i in range(config['num_steps']):
-            if config['optimizer'] == 'sam':
-                self.opt.zero_grad()
-                pred_source = model(X_source)
-                pred_target = model(X_target)
-                source_loss = self.loss_fun(pred_source, y_source)
-                ot_cost = self.calc_ot(pred_source, pred_target, y_source)
-                loss = source_loss + self.scale * ot_cost
-                fabric.backward(loss)
-                def closure():
-                    self.opt.zero_grad()
-                    pred_source = model(X_source)
-                    pred_target = model(X_target)
-                    source_loss = self.loss_fun(pred_source, y_source)
-                    ot_cost = self.calc_ot(pred_source, pred_target, y_source)
-                    loss = source_loss + self.scale * ot_cost
-                    fabric.backward(loss)
-                    return loss
-                self.opt.step(closure)
-            elif config['optimizer'] == 'kfac':
-                self.opt.zero_grad()
-                pred_source = model(X_source)
-                pred_target = model(X_target)
-                source_loss = self.loss_fun(pred_source, y_source)
-                ot_cost = self.calc_ot(pred_source, pred_target, y_source)
-                loss = source_loss + self.scale * ot_cost
-                fabric.backward(loss)
-                config['pre'].step() # this is a bit of a hack for now
-                self.opt.step()
-            elif config['optimizer'] == 'dfw':
-                self.opt.zero_grad()
-                pred_source = model(X_source)
-                pred_target = model(X_target)
-                source_loss = self.loss_fun(pred_source, y_source)
-                ot_cost = self.calc_ot(pred_source, pred_target, y_source)
-                loss = self.scale * source_loss + ot_cost
-                fabric.backward(loss)
-                self.opt.step(lambda: float(loss))
-            else:
-                self.opt.zero_grad()
-                pred_source = model(X_source)
-                pred_target = model(X_target)
-                source_loss = self.loss_fun(pred_source, y_source)
-                ot_cost = self.calc_ot(pred_source, pred_target, y_source)
-                loss = self.scale * source_loss + ot_cost
-                fabric.backward(loss)
-                self.opt.step()
-            # print(f"WRR loss at step {i}: {loss}")
-
-
-    def validate(self, config, model, fabric, X_source, y_source, X_target):
-        pass
-
-
-    def checkpoint(self, config, model, fabric, X_source, y_source, X_target, save_path):
+        self.opt.zero_grad()
         pred_source = model(X_source)
         pred_target = model(X_target)
         source_loss = self.loss_fun(pred_source, y_source)
         ot_cost = self.calc_ot(pred_source, pred_target, y_source)
-        val_loss = source_loss + self.scale * ot_cost
-        if val_loss < self.best_val_loss:
-            print(f"Saving loss {val_loss} as best loss so far")
-            # save dictionary with everything needed
-            checkpoint = {
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': self.opt.state_dict(),
-                'loss': val_loss
-            }
-            torch.save(checkpoint, save_path)
-            self.best_val_loss = val_loss
-        else:
-            print(f"Loading previous model with loss {self.best_val_loss} vs. current loss {val_loss}")
-            checkpoint = torch.load(save_path, weights_only=True)
-            model.load_state_dict(checkpoint['model_state_dict'])
-            self.opt.load_state_dict(checkpoint['optimizer_state_dict'])
+        loss = self.scale * source_loss + ot_cost
+        fabric.backward(loss)
+        self.opt.step()
+        if config['print_during_opt'] is True:
+            print(f"WRR: {loss.item()}, ot_cost: {ot_cost.item()}, source_loss: {source_loss.item()}")
+
+
+    def validate(self, config, model, fabric, X_source, y_source, X_target):
+        pass

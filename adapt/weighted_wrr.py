@@ -18,7 +18,6 @@ class WeightedWRR:
         fabric.setup(model, opt)
         self.opt = opt
         self.scale = config['wrr_scale']
-        self.p = config['wrr_norm']
         self.reg = config['wrr_entropy_reg']
         self.best_val_loss = torch.inf
         self.match_to_labels = config['match_to_labels']
@@ -33,51 +32,37 @@ class WeightedWRR:
         w_target = torch.ones(num_target, device=fabric.device) / num_target
 
         if self.match_to_labels is True:
-            cost_mat = torch.cdist(y_source, pred_target, 2) ** self.p
+            cost_mat = torch.cdist(y_source, pred_target, 2)
         else:
-            cost_mat = torch.cdist(pred_source, pred_target, 2) ** self.p
-            self.loss_fun.reduction = 'none'
-            losses = self.loss_fun(pred_source, y_source)
-            self.loss_fun.reduction = 'mean'
-            cost_mat += cost_mat + losses[:, None]
+            cost_mat = torch.cdist(pred_source, pred_target, 2)
+            source_losses = self.loss_fun(pred_source, y_source, reduction='none')
+            cost_mat = cost_mat + source_losses[:, None]
         ot_mat = torch.softmax(-cost_mat / self.reg, dim=0) * w_target[None, :]
         loss = torch.sum(ot_mat * cost_mat)
-        return loss, ot_mat
+        w_source = torch.sum(ot_mat, dim=1)
+        w_source_loss = torch.sum(w_source * source_losses)
+        return loss, ot_mat, w_source_loss
 
 
     def adapt(self, config, model, fabric, X_source, y_source, X_target, y_target=[]):
         self.opt.zero_grad()
-        loss, _ = self.calc_loss(model, fabric, X_source, y_source, X_target)
+        loss, ot_mat, w_source_loss = self.calc_loss(model, fabric, X_source, y_source, X_target)
         if self.add_source_loss is True:
-            pred_source = model(X_source)
-            loss += self.scale * self.loss_fun(pred_source, y_source)
+            total_loss = loss + self.scale * self.loss_fun(model(X_source), y_source)
         fabric.backward(loss)
-        closure = None
-        if config['optimizer'] == 'sam':
-            def closure(preds, labels):
-                loss = self.calc_loss(model, fabric, X_source, y_source, X_target)
-                if self.add_source_loss is True:
-                    pred_source = model(X_source)
-                    loss += self.scale * self.loss_fun(pred_source, y_source)
-                loss.backward()
-                return loss
-        self.opt.step(closure)
+        self.opt.step()
+        if config['print_during_opt'] is True:
+            w_ot_cost = loss - w_source_loss
+            print(f"W-WRR: {loss.item()}, w_ot_cost: {w_ot_cost.item()}, w_source_loss: {w_source_loss.item()}")
 
 
-    def checkpoint(self, config, model, fabric, X_source, y_source, X_target, save_path):
-        val_loss = self.calc_loss(model, fabric, X_source, y_source, X_target)
-        if val_loss < self.best_val_loss:
-            print(f"Saving loss {val_loss} as best loss so far")
-            # save dictionary with everything needed
-            checkpoint = {
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': self.opt.state_dict(),
-                'loss': val_loss
-            }
-            torch.save(checkpoint, save_path)
-            self.best_val_loss = val_loss
-        else:
-            print(f"Loading previous model with loss {self.best_val_loss} vs. current loss {val_loss}")
-            checkpoint = torch.load(save_path, weights_only=True)
-            model.load_state_dict(checkpoint['model_state_dict'])
-            self.opt.load_state_dict(checkpoint['optimizer_state_dict'])
+    @torch.no_grad()
+    def validate(self, config, model, fabric, X_source, y_source, X_target):
+        pass
+        '''
+        loss, ot_mat, _ = self.calc_loss(model, fabric, X_source, y_source, X_target)
+        print(f"Weighted WRR: {loss}")
+        w_source = torch.sum(ot_mat, dim=1)
+        w_sort, _ = torch.sort(w_source, descending=True)
+        print(f"Top 10 weight elements: {w_sort[:10].cpu().numpy()}")
+        '''
