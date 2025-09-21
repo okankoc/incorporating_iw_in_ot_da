@@ -232,7 +232,7 @@ if __name__ == "__main__":
         'optimizer': 'adam', # alternatives: adam, sgd
         'learning_rate': 1e-3, # use 1e-4 for ResNets or a learning scheduler
         'momentum': 0.9, # for SGD
-        'weight_decay': 0.01,
+        'weight_decay': 0.0,
 
         # Data loader options
         'batch_size': 64,
@@ -245,7 +245,7 @@ if __name__ == "__main__":
         'algs': ['wrr'], # wrr, weighted_wrr, cons_wrr, lje, erm, dann, fdal, reverse-kl
         'wrr_scale': 1.0,
         'wrr_norm': 1, # only for wrr, not clear how to use p = 2 for weighted OT
-        'wrr_entropy_reg': 1e-4,
+        'wrr_entropy_reg': 1e-2,
         'wrr_thresh': 0.01, # for constrained WRR
         'add_source_loss': True, # for weighted WRR
         'match_to_labels': False,
@@ -258,11 +258,13 @@ if __name__ == "__main__":
         'print_every_n': 50,
         'report_source_train_risk': False,
         'report_target_train_risk': False,
-        'calc_entanglement': False,
+        'calc_label_shift': False,
+        'calc_entanglement': True,
         'calc_margin': False,
         'calc_wrr': True,
         'calc_weighted_wrr': False,
-        'calc_grad_info': True,
+        'calc_weight_info': False,
+        'calc_grad_info': False,
         'pretrain_on_both': False, # starting from a model that 'cheats'!
         'adapt_only_last_layer': False,
 

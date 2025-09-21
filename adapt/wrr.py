@@ -48,7 +48,19 @@ class WRR:
         self.opt.step()
         if config['print_during_opt'] is True:
             print(f"WRR: {loss.item()}, ot_cost: {ot_cost.item()}, source_loss: {source_loss.item()}")
-
+            # calc_w_distance_label_shift(y_source, y_target, model.num_classes)
 
     def validate(self, config, model, fabric, X_source, y_source, X_target):
         pass
+
+
+
+# Assuming Euclidean distance is to be used for W_{1,l} computation,
+# the result is equal to \sqrt(2) / 2 * \sum_i |p_i - q_i|
+def calc_w_distance_label_shift(y_source, y_target, num_classes):
+    p_y = torch.sum(y_source, dim=0)
+    p_y /= torch.sum(p_y)
+    q_y = torch.sum(y_target, dim=0)
+    q_y /= torch.sum(q_y)
+    w_1_euclidean_dist = np.sqrt(2) * torch.sum(torch.abs(p_y - q_y)) / 2
+    print(f"W1_distance_labels: {w_1_euclidean_dist}")
