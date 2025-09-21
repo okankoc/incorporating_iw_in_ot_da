@@ -48,7 +48,7 @@ class WeightedWRR:
         self.opt.zero_grad()
         loss, ot_mat, w_source_loss = self.calc_loss(model, fabric, X_source, y_source, X_target)
         if self.add_source_loss is True:
-            total_loss = loss + self.scale * self.loss_fun(model(X_source), y_source)
+            loss = loss + self.scale * self.loss_fun(model(X_source), y_source)
         fabric.backward(loss)
         self.opt.step()
         if config['print_during_opt'] is True:

@@ -128,7 +128,7 @@ def calc_weighted_wrr(model, fabric, loss_fun, f_source, f_target, y_source, reg
     w_target = torch.ones(num_target, device=fabric.device) / num_target
     cost_mat = torch.cdist(f_source, f_target, 2)
     source_losses = loss_fun(f_source, y_source, reduction='none')
-    cost_mat += cost_mat + source_losses[:, None]
+    cost_mat = cost_mat + source_losses[:, None]
     ot_mat = torch.softmax(-cost_mat / reg, dim=0) * w_target[None, :]
     loss = torch.sum(ot_mat * cost_mat)
     w_source = torch.sum(ot_mat, dim=1)

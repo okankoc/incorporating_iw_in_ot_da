@@ -17,10 +17,9 @@ class MarginLoss(nn.Module):
 class EuclideanLoss(nn.Module):
     def __init__(self):
         super(EuclideanLoss, self).__init__()
-        self.reduction = 'mean'
 
-    def forward(self, x, y):
+    def forward(self, x, y, reduction='mean'):
         losses = torch.sqrt(torch.sum((x - y) ** 2, dim=1))
-        if self.reduction == 'mean':
+        if reduction == 'mean':
             return torch.mean(losses)
         return losses

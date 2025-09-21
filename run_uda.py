@@ -221,10 +221,10 @@ if __name__ == "__main__":
     config = {
         # Experiment details
         'seed': 2,
-        'device': 'cpu', # 'cpu' or 'auto' to find gpu automatically
+        'device': 'auto', # 'cpu' or 'auto' to find gpu automatically
 
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        'model': 'MLP',
+        'model': 'ConvNet',
         'resnet_size': 18, # 18 or 50
         'pretrain': True,
         'num_pretrain_epochs': 5, # if pretrain is True
@@ -242,10 +242,10 @@ if __name__ == "__main__":
         'class_balanced': False,
 
         # Algorithms and their hyperparameters/options
-        'algs': ['wrr'], # wrr, weighted_wrr, cons_wrr, lje, erm, dann, fdal, reverse-kl
+        'algs': ['weighted_wrr'], # wrr, weighted_wrr, cons_wrr, lje, erm, dann, fdal, reverse-kl
         'wrr_scale': 1.0,
         'wrr_norm': 1, # only for wrr, not clear how to use p = 2 for weighted OT
-        'wrr_entropy_reg': 1e-2,
+        'wrr_entropy_reg': 1e-3,
         'wrr_thresh': 0.01, # for constrained WRR
         'add_source_loss': True, # for weighted WRR
         'match_to_labels': False,
@@ -259,10 +259,10 @@ if __name__ == "__main__":
         'report_source_train_risk': False,
         'report_target_train_risk': False,
         'calc_label_shift': False,
-        'calc_entanglement': True,
+        'calc_entanglement': False,
         'calc_margin': False,
         'calc_wrr': True,
-        'calc_weighted_wrr': False,
+        'calc_weighted_wrr': True,
         'calc_weight_info': False,
         'calc_grad_info': False,
         'pretrain_on_both': False, # starting from a model that 'cheats'!
@@ -271,7 +271,7 @@ if __name__ == "__main__":
         # Test set dataloader options
         'test_batch_size': 512,
         'checkpoint': False,
-        'validate': True,
+        'validate': False,
     }
 
     fabric = Fabric(accelerator=config['device'], devices="auto", strategy="auto")
