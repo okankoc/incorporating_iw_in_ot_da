@@ -14,11 +14,11 @@ from lightning import Fabric
 # Code from this repo
 import utils
 import shifts
-from loss import MarginLoss, EuclideanLoss
+from loss import MarginLoss, EuclideanLoss, CELoss
 from adapt.wrr import WRR
 from adapt.weighted_wrr import WeightedWRR
 from adapt.constrained_wrr import ConstrainedWRR
-from adapt.oracle import Oracle
+from adapt.oracle import OracleLJE, OracleCC
 from adapt.erm import ERM
 from adapt.dann import DANN
 from adapt.fdal import FDAL
@@ -50,7 +50,9 @@ def init_algorithm(config, name, model, loss_fun, opt, fabric):
     if name == 'cons_wrr':
         alg = ConstrainedWRR(config, fabric, model, loss_fun, opt)
     if name == 'lje':
-        alg = Oracle(fabric, model, loss_fun, opt)
+        alg = OracleLJE(fabric, model, loss_fun, opt)
+    if name == 'cc':
+        alg = OracleCC(config, fabric, model, loss_fun, opt)
     if name == 'erm':
         alg = ERM(fabric, model, loss_fun, opt)
     if name == 'dann':
@@ -215,8 +217,8 @@ def run_uda_experiments(fabric, config):
 
 if __name__ == "__main__":
     torch.set_default_dtype(torch.float32)
-    torch.set_printoptions(precision=2, sci_mode=False)
-    # torch.autograd.set_detect_anomaly(True)
+    torch.set_printoptions(precision=3, sci_mode=False)
+    torch.autograd.set_detect_anomaly(True)
 
     config = {
         # Experiment details
@@ -227,8 +229,8 @@ if __name__ == "__main__":
         'model': 'ConvNet',
         'resnet_size': 18, # 18 or 50
         'pretrain': True,
-        'num_pretrain_epochs': 5, # if pretrain is True
-        'loss': MarginLoss(), #MarginLoss(), EuclideanLoss(), nn.CrossEntropyLoss(),
+        'num_pretrain_epochs': 1, # if pretrain is True
+        'loss': MarginLoss(), #MarginLoss(), EuclideanLoss(), CrossEntropy
         'optimizer': 'adam', # alternatives: adam, sgd
         'learning_rate': 1e-3, # use 1e-4 for ResNets or a learning scheduler
         'momentum': 0.9, # for SGD
@@ -238,16 +240,16 @@ if __name__ == "__main__":
         'batch_size': 64,
 
         # Distribution shift scenario (MNIST_to_USPS, CIFAR10C, ...)
-        'scenario': 'MNIST_to_USPS',
+        'scenario': 'MNIST_to_MNIST_M',
         'class_balanced': False,
 
         # Algorithms and their hyperparameters/options
-        'algs': ['weighted_wrr'], # wrr, weighted_wrr, cons_wrr, lje, erm, dann, fdal, reverse-kl
+        'algs': ['cc'], # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
         'wrr_scale': 1.0,
         'wrr_norm': 1, # only for wrr, not clear how to use p = 2 for weighted OT
         'wrr_entropy_reg': 1e-3,
         'wrr_thresh': 0.01, # for constrained WRR
-        'add_source_loss': True, # for weighted WRR
+        'add_source_loss': True, # for weighted WRR or for 'weighted-joint' mode in oracle-CC
         'match_to_labels': False,
         'num_epochs': 2,
         'num_steps': 1, # normally this is one, if it is more than one, we print the loss values
@@ -262,7 +264,8 @@ if __name__ == "__main__":
         'calc_entanglement': False,
         'calc_margin': False,
         'calc_wrr': True,
-        'calc_weighted_wrr': True,
+        'calc_weighted_wrr': False,
+        'verbose_weighted_wrr': False,
         'calc_weight_info': False,
         'calc_grad_info': False,
         'pretrain_on_both': False, # starting from a model that 'cheats'!

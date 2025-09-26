@@ -59,10 +59,3 @@ class WeightedWRR:
     @torch.no_grad()
     def validate(self, config, model, fabric, X_source, y_source, X_target):
         pass
-        '''
-        loss, ot_mat, _ = self.calc_loss(model, fabric, X_source, y_source, X_target)
-        print(f"Weighted WRR: {loss}")
-        w_source = torch.sum(ot_mat, dim=1)
-        w_sort, _ = torch.sort(w_source, descending=True)
-        print(f"Top 10 weight elements: {w_sort[:10].cpu().numpy()}")
-        '''

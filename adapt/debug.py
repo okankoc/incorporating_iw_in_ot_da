@@ -2,6 +2,7 @@ import torch
 import ot
 import geomloss
 import numpy as np
+import utils
 
 
 # Debugging by printing Wasserstein-based bounds for all methods!
@@ -16,9 +17,28 @@ def debug_model(config, model, loss_fun, fabric, X_source, y_source, X_target, y
         wrr = source_loss + ot_cost
         print(f"WRR: {wrr.item()}, ot_cost: {ot_cost.item()}, source_loss: {source_loss.item()}")
     if config['calc_weighted_wrr'] == True:
-        w_wrr, w_ot_mat, w_source_loss = calc_weighted_wrr(model, fabric, loss_fun, pred_source, pred_target, y_source, config['wrr_entropy_reg'])
+        w_wrr, w_ot_mat, w_source, w_source_loss = calc_weighted_wrr(model, fabric, loss_fun, pred_source, pred_target, y_source, config['wrr_entropy_reg'])
         w_ot_cost = w_wrr - w_source_loss
         print(f"W-WRR: {w_wrr.item()}, w_ot_cost: {w_ot_cost.item()}, w_source_loss: {w_source_loss.item()}")
+
+        # Get the top 5 weights
+        if config['verbose_weighted_wrr'] == True:
+            vals, w_idx = torch.sort(w_source, descending=True)
+            source_losses = loss_fun(pred_source, y_source, reduction='none')
+            num_select = 5
+            print(f"Top {num_select} source weights: {vals[:num_select].detach().numpy()}, with total weight: {torch.sum(vals[:num_select])}")
+            print(f"Their labels: {torch.argmax(y_source[w_idx[:num_select]], dim=1).detach().numpy()}")
+            print(f"Their losses: {source_losses[w_idx[:num_select]].detach().numpy()}")
+            # Print their labels + num of points in batch with same label
+            num_source = y_source.shape[0]
+            print(f"Num of label proportions in batch: {(torch.sum(y_source, dim=0) / num_source).detach().numpy()}")
+            print(f"Average loss per label: {torch.sum(source_losses[:, None] * y_source, dim=0) / torch.sum(y_source, dim=0)}")
+            y_preds = torch.argmax(pred_target, dim=1)
+            y_preds_hot = utils.one_hot(y_preds, model.num_classes)
+            num_target = pred_target.shape[0]
+            print(f"Num of predicted target class proportions in batch: {(torch.sum(y_preds_hot, dim=0) / num_target).detach().numpy()}")
+
+
     if config['calc_entanglement'] == True:
         y_dist = torch.cdist(y_source, y_target)
         entanglement = torch.sum(ot_mat * y_dist)
@@ -133,7 +153,7 @@ def calc_weighted_wrr(model, fabric, loss_fun, f_source, f_target, y_source, reg
     loss = torch.sum(ot_mat * cost_mat)
     w_source = torch.sum(ot_mat, dim=1)
     w_source_loss = torch.sum(w_source * source_losses)
-    return loss, ot_mat, w_source_loss
+    return loss, ot_mat, w_source, w_source_loss
 
 
 def calc_ot(f_source, f_target, fabric, reg=1e-6):

@@ -23,3 +23,16 @@ class EuclideanLoss(nn.Module):
         if reduction == 'mean':
             return torch.mean(losses)
         return losses
+
+
+
+class CELoss(nn.Module):
+    def __init__(self):
+        super(CELoss, self).__init__()
+        self.loss = nn.CrossEntropyLoss(reduction='none')
+
+    def forward(self, x, y, reduction='mean'):
+        losses = self.loss(x, y)
+        if reduction == 'mean':
+            return torch.mean(losses)
+        return losses
