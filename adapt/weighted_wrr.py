@@ -10,8 +10,8 @@ import numpy as np
 from scipy.spatial.distance import cdist
 import geomloss
 import copy
-import ot      # We don't need POT if we don't need to compute entanglement!
-from sinkhorn_fot import mm_unbalanced
+import ot
+from sinkhorn_uot import mm_unbalanced
 
 # Weighted Wassertein regularized risk
 class WeightedWRR:

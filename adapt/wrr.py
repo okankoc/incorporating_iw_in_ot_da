@@ -23,6 +23,7 @@ class WRR:
         self.propagate_labels = config['propagate_labels']
         self.print_info = config['print_info']
 
+
     def calc_ot_loss(self, f_source, f_target):
         ot_loss = geomloss.SamplesLoss(loss="sinkhorn", p=self.p, blur=self.reg)
         cost = ot_loss(f_source, f_target)

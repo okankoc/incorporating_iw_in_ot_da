@@ -1,3 +1,4 @@
+import os
 import time
 import torch
 import numpy as np
@@ -46,7 +47,8 @@ def report_acc(scenario, model, loss_fun, report_source_train, report_target_tra
 
 
 def train_model_on_source(config, model, loss_fun, scenario, opt, fabric):
-    save_path = "save_files/" + scenario.name + "/" + model.name + ".pth"
+    folder_path = "save_files/" + scenario.name + "/"
+    save_path = folder_path + model.name + ".pth"
     try:
         # Load parameters from a file
         model.load_state_dict(torch.load(save_path, weights_only=True))
@@ -67,13 +69,15 @@ def train_model_on_source(config, model, loss_fun, scenario, opt, fabric):
         # Report accuracy/loss on whole training dataset
         test(scenario.source_dataloader, model, loss_fun)
         log.info(f"Saving parameters to file: {save_path}")
+        os.makedirs(folder_path, exist_ok=True)
         torch.save(model.state_dict(), save_path)
     return model
 
 
 # Checks that the same network architecture used for both source *and* target can achieve high accuracy
 def train_model_on_source_and_target(config, model, loss_fun, scenario, opt, fabric):
-    save_path = "save_files/" + scenario.name + "/train_on_both/" + model.name + ".pth"
+    folder_path = "save_files/" + scenario.name + "/train_on_both/"
+    save_path = folder_path + model.name + ".pth"
     try:
         # Load parameters from a file
         model.load_state_dict(torch.load(save_path, weights_only=True))
@@ -96,6 +100,7 @@ def train_model_on_source_and_target(config, model, loss_fun, scenario, opt, fab
         # Report accuracy/loss on whole training dataset
         test(scenario.source_dataloader, model, loss_fun)
         log.info(f"Saving parameters to file: {save_path}")
+        os.makedirs(folder_path, exist_ok=True)
         torch.save(model.state_dict(), save_path)
     return model
 

@@ -225,7 +225,7 @@ def setup_config():
         'model': 'MLP',
         'resnet_size': 18, # 18 or 50
         'pretrain': True,
-        'num_pretrain_epochs': 1, # if pretrain is True
+        'num_pretrain_epochs': 5, # if pretrain is True
         'loss': MarginLoss(), #MarginLoss(), EuclideanLoss(), CrossEntropy
         'optimizer': 'adam', # alternatives: adam, sgd
         'learning_rate': 1e-3, # use 1e-4 for ResNets or a learning scheduler
@@ -239,7 +239,7 @@ def setup_config():
         'scenario': 'MNIST_to_USPS',
         'class_balanced': False,
         'num_epochs': 2,
-        'algs': ['wrr'], # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
+        'algs': ['weighted_wrr'], # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
 
         # Debugging algorithms
         'debug': True,
@@ -287,7 +287,7 @@ def setup_alg_config(config):
         'entropy_reg': 1e-1,
         'add_source_loss': True,
         'separate_optim': True,
-        'uot_alg': 'sinkhorn', # sinkhorn or mm
+        'uot_alg': 'mm', # sinkhorn or mm
         'uot_init': False, # initialize MM with semi-relaxed UOT
         'uot_iter_max': 1000,
         'autograd_at_convergence': True,
