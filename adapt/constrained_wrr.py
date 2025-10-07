@@ -8,10 +8,10 @@ class ConstrainedWRR:
         self.name = 'WRR'
         fabric.setup(model, opt)
         self.opt = opt
-        self.p = config['wrr_norm']
-        self.reg = config['wrr_entropy_reg']
-        self.thresh = config['wrr_thresh']
-        self.scale = config['wrr_scale']
+        self.p = config['norm']
+        self.reg = config['entropy_reg']
+        self.thresh = config['thresh']
+        self.scale = config['scale']
         self.mode = 0
 
     def calc_ot(self, f_source, f_target):
@@ -23,7 +23,7 @@ class ConstrainedWRR:
         return ot_loss(f_source, f_target)
 
 
-    def adapt(self, config, model, fabric, X_source, y_source, X_target, y_target=[]):
+    def adapt(self, model, fabric, X_source, y_source, X_target, y_target=[]):
 
         self.opt.zero_grad()
         pred_source = model(X_source)
@@ -37,14 +37,10 @@ class ConstrainedWRR:
             source_loss = self.loss_fun(pred_source, y_source)
             loss = source_loss + self.scale * ot_cost
             fabric.backward(loss)
-        if config['optimizer'] == 'dfw':
-            self.opt.step(lambda: float(loss))
-        else:
-            self.opt.step()
 
 
     @torch.no_grad()
-    def validate(self, config, model, fabric, X_source, y_source, X_target):
+    def validate(self, model, fabric, X_source, y_source, X_target):
         pred_source = model(X_source)
         pred_target = model(X_target)
         ot_cost = self.calc_ot(pred_source, pred_target)

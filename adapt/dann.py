@@ -27,18 +27,11 @@ class ReverseLayerF(Function):
 class DANN:
     def __init__(
             self, config, fabric, model, loss_fun, opt):
-        if "mlp" in model.name:
-            print("Setting discriminator to MLP")
-            layer_to_apply_disc = -2
-            self.discriminator = MLP([100, 10, 2], nn.ReLU())
-        else:
-            print("Setting discriminator to a small CNN")
-            layer_to_apply_disc = "flatten"
-            self.discriminator = ConvDomainClassifier()
+        layer_to_apply_disc = config['layer_to_apply_disc']
+        self.discriminator = config['discriminator']
         self.name = "DANN"
         model.track_features(layer_to_apply_disc)
-        self.opt_model = torch.optim.Adam(
-            model.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'])
+        self.opt_model = opt
         self.opt_disc = torch.optim.Adam(
             self.discriminator.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'])
         fabric.setup(self.discriminator, self.opt_disc)
@@ -57,7 +50,7 @@ class DANN:
         return class_output, domain_output
 
 
-    def adapt(self, config, model, fabric, X_source, y_source, X_target, y_target=[]):
+    def adapt(self, model, fabric, X_source, y_source, X_target, y_target=[]):
         source_batch_size = X_source.shape[0]
         # Feeding in source inputs
         domain_label = utils.one_hot(torch.zeros(source_batch_size, device=fabric.device, dtype=torch.long), 2)
@@ -79,5 +72,5 @@ class DANN:
         self.opt_disc.zero_grad()
 
 
-    def validate(self, config, model, fabric, X_train, y_train, X_shift):
+    def validate(self, model, fabric, X_train, y_train, X_shift):
         pass

@@ -17,7 +17,7 @@ def debug_model(config, model, loss_fun, fabric, X_source, y_source, X_target, y
         wrr = source_loss + ot_cost
         print(f"WRR: {wrr.item()}, ot_cost: {ot_cost.item()}, source_loss: {source_loss.item()}")
     if config['calc_weighted_wrr'] == True:
-        w_wrr, w_ot_mat, w_source, w_source_loss = calc_weighted_wrr(model, fabric, loss_fun, pred_source, pred_target, y_source, config['wrr_entropy_reg'])
+        w_wrr, w_ot_mat, w_source, w_source_loss = calc_weighted_wrr(model, fabric, loss_fun, pred_source, pred_target, y_source, reg=1e-1)
         w_ot_cost = w_wrr - w_source_loss
         print(f"W-WRR: {w_wrr.item()}, w_ot_cost: {w_ot_cost.item()}, w_source_loss: {w_source_loss.item()}")
 
@@ -154,8 +154,8 @@ def calc_weighted_wrr(model, fabric, loss_fun, f_source, f_target, y_source, reg
     num_source = y_source.shape[0]
     w_source = torch.ones(num_source, device=fabric.device) / num_source
     reg_m = (1.0, 100.0)
-    # ot_mat = ot.sinkhorn_unbalanced(w_source, w_target, cost_mat, reg, reg_m, method="sinkhorn_stabilized")
-    ot_mat = ot.unbalanced.mm_unbalanced(w_source, w_target, cost_mat, reg_m, div='kl', numItermax=1000)
+    ot_mat = ot.sinkhorn_unbalanced(w_source, w_target, cost_mat, reg, reg_m, method="sinkhorn_stabilized")
+    # ot_mat = ot.unbalanced.mm_unbalanced(w_source, w_target, cost_mat, reg_m, div='kl', numItermax=1000)
 
     loss = torch.sum(ot_mat * cost_mat)
     w_source = torch.sum(ot_mat, dim=1)

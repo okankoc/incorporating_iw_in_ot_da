@@ -6,16 +6,16 @@ from models.prob_model import ProbModel
 
 
 class ReverseKL():
-    def __init__(self, config, fabric, model, loss_fun, opt, alpha_reverse, alpha_forward, augment_softmax):
+    def __init__(self, config, fabric, model, loss_fun, opt):
         super(ReverseKL, self).__init__()
         self.loss_fun = copy.deepcopy(loss_fun)
         self.model = ProbModel(model)
         fabric.setup(self.model, opt)
         self.opt = opt
         self.name = "Reverse-KL"
-        self.alpha_reverse = alpha_reverse  # as the reverse-KL-regularizer scale
-        self.alpha_forward = alpha_forward
-        self.augment_softmax = augment_softmax
+        self.alpha_reverse = config['alpha_reverse']  # as the reverse-KL-regularizer scale
+        self.alpha_forward = config['alpha_forward']
+        self.augment_softmax = config['augment_softmax']
 
     def compute_kl(self, mean_s, std_s, sample_s, distr_s, mean_t, std_t, sample_t, distr_t, device):
         mix_coeff_source = torch.distributions.categorical.Categorical(torch.ones(mean_s.shape[0], device=device))
@@ -29,7 +29,7 @@ class ReverseKL():
             )
         return kl_reg
 
-    def adapt(self, config, model, fabric, X_source, y_source, X_target, y_target=[]):
+    def adapt(self, model, fabric, X_source, y_source, X_target, y_target=[]):
         mean_s, std_s, sample_s, out_s, distr_s = self.model.forward_distr(X_source)
         mean_t, std_t, sample_t, out_t, distr_t = self.model.forward_distr(X_target)
 
@@ -46,7 +46,7 @@ class ReverseKL():
         self.opt.zero_grad()
 
 
-    def validate(self, config, model, fabric, X_source, y_source, X_target):
+    def validate(self, model, fabric, X_source, y_source, X_target):
         mean_s, std_s, sample_s, out_s, distr_s = self.model.forward_distr(X_source)
         mean_t, std_t, sample_t, out_t, distr_t = self.model.forward_distr(X_target)
         source_loss = self.loss_fun(out_s, y_source)

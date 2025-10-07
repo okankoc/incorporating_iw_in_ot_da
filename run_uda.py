@@ -44,23 +44,23 @@ def reset_all(seed):
 def init_algorithm(config, name, model, loss_fun, opt, fabric):
     # Prepare adaptation methods
     if name == 'wrr':
-        alg = WRR(config, fabric, model, loss_fun, opt)
+        alg = WRR(config['wrr'], fabric, model, loss_fun, opt)
     if name == 'weighted_wrr':
-        alg = WeightedWRR(config, fabric, model, loss_fun, opt)
+        alg = WeightedWRR(config['weighted_wrr'], fabric, model, loss_fun, opt)
     if name == 'cons_wrr':
-        alg = ConstrainedWRR(config, fabric, model, loss_fun, opt)
+        alg = ConstrainedWRR(config['cons_wrr'], fabric, model, loss_fun, opt)
     if name == 'lje':
         alg = OracleLJE(fabric, model, loss_fun, opt)
     if name == 'cc':
-        alg = OracleCC(config, fabric, model, loss_fun, opt)
+        alg = OracleCC(config['cc'], fabric, model, loss_fun, opt)
     if name == 'erm':
         alg = ERM(fabric, model, loss_fun, opt)
     if name == 'dann':
-        alg = DANN(config, fabric, model, loss_fun, opt)
+        alg = DANN(config['dann'], fabric, model, loss_fun, opt)
     if name == 'fdal':
-        alg = FDAL(config, fabric, model, loss_fun, opt)
+        alg = FDAL(config['fdal'], fabric, model, loss_fun, opt)
     if name == 'reverse-kl':
-        alg = ReverseKL(config, fabric, model, loss_fun, opt, alpha_reverse=0.1, alpha_forward=0.1, augment_softmax=0.0)
+        alg = ReverseKL(config['reverse_kl'], fabric, model, loss_fun, opt)
     return alg
 
 
@@ -81,7 +81,7 @@ def run_uda(config, model, scenario, loss_fun, fabric):
                 y_shift = utils.one_hot(y_shift, scenario.num_classes)
                 if batch_idx % 10 == 0:
                     print(f"Batch id: {batch_idx}")
-                alg.adapt(config, model, fabric, X_train, y_train, X_shift, y_shift)
+                alg.adapt(model, fabric, X_train, y_train, X_shift, y_shift)
                 if config['debug'] is True and (batch_idx % config['print_every_n'] == 0):
                     debug_method(config, alg, model, loss_fun, scenario, fabric, batch_idx / config['print_every_n'])
                 batch_idx += 1
@@ -102,7 +102,7 @@ def debug_method(config, method, model, loss_fun, scenario, fabric, idx_des):
             print(f"Debugging/validating on {idx}'th test batch")
             y_train = utils.one_hot(y_train, scenario.num_classes)
             y_shift = utils.one_hot(y_shift, scenario.num_classes)
-            debug_model(config, model, loss_fun, fabric, X_train, y_train, X_shift, y_shift)
+            debug_model(config['debug_options'], model, loss_fun, fabric, X_train, y_train, X_shift, y_shift)
             if config['validate'] is True:
                 method.validate(config, model, fabric, X_train, y_train, X_shift)
             break
@@ -215,11 +215,7 @@ def run_uda_experiments(fabric, config):
     run_uda(config, model, scenario, loss_fun, fabric)
 
 
-if __name__ == "__main__":
-    torch.set_default_dtype(torch.float32)
-    # torch.set_printoptions(precision=3, sci_mode=False)
-    # torch.autograd.set_detect_anomaly(True)
-
+def setup_config():
     config = {
         # Experiment details
         'seed': 2,
@@ -242,32 +238,14 @@ if __name__ == "__main__":
         # Distribution shift scenario (MNIST_to_USPS, CIFAR10C, ...)
         'scenario': 'MNIST_to_USPS',
         'class_balanced': False,
-
-        # Algorithms and their hyperparameters/options
-        'algs': ['weighted_wrr'], # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
-        'wrr_scale': 1.0,
-        'wrr_norm': 1, # only for wrr, not clear how to use p = 2 for weighted OT
-        'wrr_entropy_reg': 1e-1,
-        'wrr_thresh': 0.01, # for constrained WRR
-        'add_source_loss': True, # for weighted WRR or for 'weighted-joint' mode in oracle-CC
-        'propagate_labels': False, # only for WRR
         'num_epochs': 2,
-        'num_steps': 1, # normally this is one, if it is more than one, we print the loss values
+        'algs': ['wrr'], # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
 
         # Debugging algorithms
         'debug': True,
-        'print_during_opt': False,
         'print_every_n': 50,
         'report_source_train_risk': False,
         'report_target_train_risk': False,
-        'calc_label_shift': False,
-        'calc_entanglement': False,
-        'calc_margin': False,
-        'calc_wrr': True,
-        'calc_weighted_wrr': True,
-        'verbose_weighted_wrr': False,
-        'calc_weight_info': False,
-        'calc_grad_info': False,
         'pretrain_on_both': False, # starting from a model that 'cheats'!
         'adapt_only_last_layer': False,
 
@@ -277,6 +255,94 @@ if __name__ == "__main__":
         'validate': False,
     }
 
+    debug_config = {
+        'calc_label_shift': False,
+        'calc_entanglement': False,
+        'calc_margin': False,
+        'calc_wrr': True,
+        'calc_weighted_wrr': True,
+        'verbose_weighted_wrr': False,
+        'calc_weight_info': False,
+        'calc_grad_info': False,
+        }
+
+    config['debug_options'] = debug_config
+
+    # Algorithms and their hyperparameters/options
+    config = setup_alg_config(config)
+    return config
+
+
+def setup_alg_config(config):
+    wrr_config = {
+        'scale': 1.0,
+        'norm': 2,
+        'entropy_reg': 1e-3,
+        'propagate_labels': False,
+        'print_info': False,
+        }
+
+    weighted_wrr_config = {
+        'scale': 1.0,
+        'entropy_reg': 1e-1,
+        'add_source_loss': True,
+        'separate_optim': True,
+        'uot_alg': 'sinkhorn', # sinkhorn or mm
+        'uot_init': False, # initialize MM with semi-relaxed UOT
+        'uot_iter_max': 1000,
+        'autograd_at_convergence': True,
+        'reg_m': (1.0, 100.0),
+        'print_info': False,
+        }
+
+    cons_wrr_config = {
+        'norm': 2,
+        'entropy_reg': 1e-3,
+        'scale': 1.0,
+        'thresh': 0.01
+        }
+
+    dann_config = {
+        'layer_to_apply_disc': 'flatten', # -2 for MLP
+        'discriminator': ConvDomainClassifier(), # or MLP([100, 10, 2], nn.ReLU())
+        }
+
+    fdal_config = {
+        'divergence': 'pearson',
+        'bottleneck_dim': 100,
+        'dropout_prob': 0.5,
+        'clip_grad_val': 1,
+    }
+
+    cc_config = {
+        'entropy_reg': 1e-3,
+        'norm': 2,
+        'mode': 'joint', # or 'weighted_joint' or 'conditional'
+        'add_source_loss': False, # only for weighted_joint
+        }
+
+    reverse_kl_config = {
+        'alpha_reverse': 0.1,
+        'alpha_forward': 0.1,
+        'augment_softmax': 0.0,
+    }
+
+    config['wrr'] = wrr_config
+    config['weighted_wrr'] = weighted_wrr_config
+    config['cons_wrr'] = cons_wrr_config
+    config['dann'] = dann_config
+    config['fdal'] = fdal_config
+    config['cc'] = cc_config
+    config['reverse_kl'] = reverse_kl_config
+    return config
+
+
+if __name__ == "__main__":
+    torch.set_default_dtype(torch.float32)
+    # torch.set_printoptions(precision=3, sci_mode=False)
+    # torch.autograd.set_detect_anomaly(True)
+
+    config = setup_config()
     fabric = Fabric(accelerator=config['device'], devices="auto", strategy="auto")
     fabric.launch()
     print(f"Fabric device: {fabric.device}")

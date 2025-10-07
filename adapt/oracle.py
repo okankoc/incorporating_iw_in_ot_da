@@ -31,12 +31,12 @@ class OracleCC:
         print(f"Initializing Oracle as {self.name}")
         self.loss_fun = copy.deepcopy(loss_fun)
         self.opt = opt
-        self.reg = config['wrr_entropy_reg']
-        self.p = config['wrr_norm']
-        self.mode = 'joint' # joint vs. weighted-joint vs. conditional
+        self.reg = config['entropy_reg']
+        self.p = config['norm']
+        self.mode = config['mode'] # joint vs. weighted-joint vs. conditional
+        self.add_source_loss = config['add_source_loss']
 
-
-    def adapt(self, config, model, fabric, X_source, y_source, X_target, y_target=[]):
+    def adapt(self, model, fabric, X_source, y_source, X_target, y_target=[]):
         pred_source = model(X_source)
         loss = self.loss_fun(pred_source, y_source)
         if len(y_target) == 0:
@@ -46,9 +46,9 @@ class OracleCC:
             loss += self.calc_max_cond_wrr_dist(model, fabric, pred_source, y_source, pred_target, y_target)
         elif self.mode == 'joint':
             loss += self.calc_joint_wrr_dist(model, fabric, pred_source, y_source, pred_target, y_target)
-        elif self.mode == 'weighted-joint':
+        elif self.mode == 'weighted_joint':
             dist = self.calc_weighted_joint_wrr_dist(model, fabric, pred_source, y_source, pred_target, y_target)
-            if config['add_source_loss'] == True:
+            if self.add_source_loss == True:
                 loss += dist
             else:
                 loss = dist
@@ -77,18 +77,6 @@ class OracleCC:
         full_target = torch.cat((pred_target, y_target), dim=1)
         return ot_loss(full_source, full_target)
 
-        # Alternative
-        '''
-        num_source = y_source.shape[0]
-        w_source = torch.ones(num_source, device=fabric.device) / num_source
-        num_target = y_target.shape[0]
-        w_target = torch.ones(num_target, device=fabric.device) / num_target
-        cost_mat = torch.cdist(pred_source, pred_target, p=2)
-        cost_mat += torch.cdist(y_source, y_target, p=2)
-        ot_mat = ot.emd(w_source, w_target, cost_mat, numItermax=5000)
-        return torch.sum(ot_mat * cost_mat)
-        '''
-
 
     def calc_max_cond_wrr_dist(self, model, fabric, pred_source, y_source, pred_target, y_target):
         w_dist = torch.zeros(model.num_classes, device=fabric.device)
@@ -107,5 +95,5 @@ class OracleCC:
         return w_dist
 
 
-    def validate(self, config, model, fabric, X_source, y_source, X_target):
+    def validate(self, model, fabric, X_source, y_source, X_target):
         pass
