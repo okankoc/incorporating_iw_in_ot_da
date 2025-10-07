@@ -28,7 +28,7 @@ def test(dataloader, model, loss_fun):
     return test_loss, correct
 
 
-def report_acc(scenario, model, loss_fun, report_source_train, report_target_train):
+def report_metrics(scenario, model, loss_fun, report_source_train, report_target_train):
     # These are very slow
     if report_source_train:
         print(f"Reporting accuracy/loss on source {scenario.source_name} training dataset...")
@@ -105,7 +105,7 @@ def train_model_on_source_and_target(config, model, loss_fun, scenario, opt, fab
     return model
 
 
-def train(dataloader, model, loss_fun, optimizer, num_epochs, fabric, report_every=1, report_acc=True):
+def train(dataloader, model, loss_fun, optimizer, num_epochs, fabric, report_every=1, report_metrics=True):
     size = len(dataloader.dataset)
     t0 = time.perf_counter()
     model.train()
@@ -120,7 +120,7 @@ def train(dataloader, model, loss_fun, optimizer, num_epochs, fabric, report_eve
             if batch % report_every == 0:
                 loss, current = loss.item(), (batch + 1) * len(X)
                 print(f"loss: {loss:>7f} epoch:{epoch+1} [{current:>5d}/{size:>5d}]")
-        if report_acc is True:
+        if report_metrics is True:
             print("Train dataset metrics:")
             test(dataloader, model, loss_fun)
     print(f"Method took {time.perf_counter() - t0} sec")

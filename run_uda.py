@@ -67,29 +67,34 @@ def init_algorithm(config, name, model, loss_fun, opt, fabric):
 def run_uda(config, model, scenario, loss_fun, fabric):
     # Run adaptation
     methods = config['algs']
-    for method_name in methods:
-        opt = init_opt(config, model)
-        alg = init_algorithm(config, method_name, model, loss_fun, opt, fabric)
-        print("===============================")
-        print(f"Algorithm {alg.name}")
-        reset_all(seed=config['seed'])
-        for epoch in range(config['num_epochs']):
-            batch_idx = 0
-            print(f"Epoch {epoch+1}")
-            for (X_train, y_train), (X_shift, y_shift) in zip(scenario.source_dataloader, scenario.target_dataloader):
-                y_train = utils.one_hot(y_train, scenario.num_classes)
-                y_shift = utils.one_hot(y_shift, scenario.num_classes)
-                if batch_idx % 10 == 0:
-                    print(f"Batch id: {batch_idx}")
-                alg.adapt(model, fabric, X_train, y_train, X_shift, y_shift)
-                if config['debug'] is True and (batch_idx % config['print_every_n'] == 0):
-                    debug_method(config, alg, model, loss_fun, scenario, fabric, batch_idx / config['print_every_n'])
-                batch_idx += 1
-
+    num_methods = len(methods)
+    num_epochs = len(config['num_epochs'])
+    results = torch.zeros(num_methods, num_runs, num_epochs, 4) # saving loss_source, acc_source, loss_target, acc_target
+    for i in range(num_methods):
+        for j in range(config['num_runs']):
+            opt = init_opt(config, model)
+            alg = init_algorithm(config, method_name, model, loss_fun, opt, fabric)
             print("===============================")
             print(f"Algorithm {alg.name}")
-            utils.report_acc(scenario, model, loss_fun, config['report_source_train_risk'], config['report_target_train_risk'])
-        model.restore_params()
+            reset_all(seed=j)
+            for epoch in range(num_epochs):
+                batch_idx = 0
+                print(f"Epoch {epoch+1}")
+                for (X_train, y_train), (X_shift, y_shift) in zip(scenario.source_dataloader, scenario.target_dataloader):
+                    y_train = utils.one_hot(y_train, scenario.num_classes)
+                    y_shift = utils.one_hot(y_shift, scenario.num_classes)
+                    if batch_idx % 10 == 0:
+                        print(f"Batch id: {batch_idx}")
+                    alg.adapt(model, fabric, X_train, y_train, X_shift, y_shift)
+                    if config['debug'] is True and (batch_idx % config['print_every_n'] == 0):
+                        debug_method(config, alg, model, loss_fun, scenario, fabric, batch_idx / config['print_every_n'])
+                    batch_idx += 1
+
+                print("===============================")
+                print(f"Algorithm {alg.name}")
+                results[i, j, epoch, :] = utils.report_metrics(scenario, model, loss_fun, config['report_source_train_risk'], config['report_target_train_risk'])
+            model.restore_params()
+    return results
 
 
 def debug_method(config, method, model, loss_fun, scenario, fabric, idx_des):
@@ -209,16 +214,33 @@ def run_uda_experiments(fabric, config):
     else:
         fabric.setup(model)
     # Report initial performance of a loaded source-trained model
-    utils.report_acc(scenario, model, loss_fun, config['report_source_train_risk'], config['report_target_train_risk'])
+    utils.report_metrics(scenario, model, loss_fun, config['report_source_train_risk'], config['report_target_train_risk'])
     model.save_params()
     model.train()
-    run_uda(config, model, scenario, loss_fun, fabric)
+    return run_uda(config, model, scenario, loss_fun, fabric)
+
+
+def plot_results(results, config):
+    os.makedirs("results", exist_ok=True)
+    methods = config['algs']
+    num_methods, num_runs, num_epochs, _ = results.shape
+    metrics = ['loss_source', 'acc_source', 'loss_target', 'acc_target']
+
+    for m, metric in enumerate(metrics):
+        save_name = "results/" + scenario.name + "_" + model.name + "_" + metric
+        fig, ax = plt.subplots()
+        for i, method in enumerate(methods):
+            stds, means = torch.std_mean(results[i, :, :, m], dim=0)
+        ax.errorbar(x=np.arange(num_epochs), y=means, yerr=stds, label=method)
+        ax.legend(loc="upper right")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        plt.savefig(save_name + ".pdf", format="pdf")
 
 
 def setup_config():
     config = {
         # Experiment details
-        'seed': 2,
         'device': 'cpu', # 'cpu' or 'auto' to find gpu automatically
 
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
@@ -238,8 +260,9 @@ def setup_config():
         # Distribution shift scenario (MNIST_to_USPS, CIFAR10C, ...)
         'scenario': 'MNIST_to_USPS',
         'class_balanced': False,
-        'num_epochs': 2,
-        'algs': ['weighted_wrr'], # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
+        'num_epochs': 10,
+        'num_runs': 5,
+        'algs': ['wrr', 'weighted_wrr'], # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
 
         # Debugging algorithms
         'debug': True,
@@ -348,4 +371,5 @@ if __name__ == "__main__":
     print(f"Fabric device: {fabric.device}")
     reset_all(seed=config['seed'])
 
-    run_uda_experiments(fabric, config)
+    res = run_uda_experiments(fabric, config)
+    plot_results(res, config['algs'])
