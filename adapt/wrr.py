@@ -21,20 +21,27 @@ class WRR:
         self.p = config['wrr_norm']
         self.reg = config['wrr_entropy_reg']
         self.best_val_loss = torch.inf
-        self.match_to_labels = config['match_to_labels']
+        self.propagate_labels = config['propagate_labels']
 
 
-    def calc_ot(self, f_source, f_target, y_source):
+    def calc_ot_loss(self, f_source, f_target):
         num_source = f_source.shape[0]
         num_target = f_target.shape[0]
 
         ### Python crashes regularly with POT so switching to GeomLoss
         ot_loss = geomloss.SamplesLoss(loss="sinkhorn", p=self.p, blur=self.reg)
-        if self.match_to_labels is True:
-            cost = ot_loss(y_source, f_target)
-        else:
-            cost = ot_loss(f_source, f_target)
-        return cost
+        cost = ot_loss(f_source, f_target)
+        # return cost
+
+
+    def calc_ot_map(self, f_source, f_target, device):
+        num_source = f_source.shape[0]
+        num_target = f_target.shape[0]
+        w_source = torch.ones(num_source, device=device) / num_source
+        w_target = torch.ones(num_target, device=device) / num_target
+        cost_mat = torch.cdist(f_source, f_target, p=2)
+        ot_mat = ot.emd(w_source, w_target, cost_mat, numItermax=5000)
+        return ot_mat
 
 
     def adapt(self, config, model, fabric, X_source, y_source, X_target, y_target=[]):
@@ -42,8 +49,14 @@ class WRR:
         pred_source = model(X_source)
         pred_target = model(X_target)
         source_loss = self.loss_fun(pred_source, y_source)
-        ot_cost = self.calc_ot(pred_source, pred_target, y_source)
-        loss = self.scale * source_loss + ot_cost
+        if self.propagate_labels is True:
+            ot_map = self.calc_ot_map(pred_source, pred_target, fabric.device)
+            num_target = pred_target.shape[0]
+            y_hat_target = (num_target * ot_map.T @ torch.argmax(y_source, dim=1).float()).to(torch.int64)
+            loss = self.scale * source_loss + self.loss_fun.forward_int(pred_target, y_hat_target)
+        else:
+            ot_cost = self.calc_ot_loss(pred_source, pred_target)
+            loss = self.scale * source_loss + ot_cost
         fabric.backward(loss)
         self.opt.step()
         if config['print_during_opt'] is True:

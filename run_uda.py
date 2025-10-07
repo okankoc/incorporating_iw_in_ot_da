@@ -217,16 +217,16 @@ def run_uda_experiments(fabric, config):
 
 if __name__ == "__main__":
     torch.set_default_dtype(torch.float32)
-    torch.set_printoptions(precision=3, sci_mode=False)
-    torch.autograd.set_detect_anomaly(True)
+    # torch.set_printoptions(precision=3, sci_mode=False)
+    # torch.autograd.set_detect_anomaly(True)
 
     config = {
         # Experiment details
         'seed': 2,
-        'device': 'auto', # 'cpu' or 'auto' to find gpu automatically
+        'device': 'cpu', # 'cpu' or 'auto' to find gpu automatically
 
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        'model': 'ConvNet',
+        'model': 'MLP',
         'resnet_size': 18, # 18 or 50
         'pretrain': True,
         'num_pretrain_epochs': 1, # if pretrain is True
@@ -240,17 +240,17 @@ if __name__ == "__main__":
         'batch_size': 64,
 
         # Distribution shift scenario (MNIST_to_USPS, CIFAR10C, ...)
-        'scenario': 'MNIST_to_MNIST_M',
+        'scenario': 'MNIST_to_USPS',
         'class_balanced': False,
 
         # Algorithms and their hyperparameters/options
-        'algs': ['cc'], # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
+        'algs': ['weighted_wrr'], # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
         'wrr_scale': 1.0,
         'wrr_norm': 1, # only for wrr, not clear how to use p = 2 for weighted OT
-        'wrr_entropy_reg': 1e-3,
+        'wrr_entropy_reg': 1e-1,
         'wrr_thresh': 0.01, # for constrained WRR
         'add_source_loss': True, # for weighted WRR or for 'weighted-joint' mode in oracle-CC
-        'match_to_labels': False,
+        'propagate_labels': False, # only for WRR
         'num_epochs': 2,
         'num_steps': 1, # normally this is one, if it is more than one, we print the loss values
 
@@ -264,7 +264,7 @@ if __name__ == "__main__":
         'calc_entanglement': False,
         'calc_margin': False,
         'calc_wrr': True,
-        'calc_weighted_wrr': False,
+        'calc_weighted_wrr': True,
         'verbose_weighted_wrr': False,
         'calc_weight_info': False,
         'calc_grad_info': False,

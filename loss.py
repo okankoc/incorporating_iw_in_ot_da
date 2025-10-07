@@ -2,6 +2,7 @@ import torch
 from torch import nn
 
 # 3rd party library for multi class hinge loss
+# Note that we modified it for reduction!
 from dfw.losses import MultiClassHingeLoss
 
 class MarginLoss(nn.Module):
@@ -12,6 +13,10 @@ class MarginLoss(nn.Module):
     # Assumes it gets one-hot-labels (all other loss functions do)
     def forward(self, x, y, reduction='mean'):
         return self.loss(x, torch.argmax(y, dim=1), reduction)
+
+    # Assume it gets integer labels
+    def forward_int(self, x, y, reduction='mean'):
+        return self.loss(x, y, reduction)
 
 
 class EuclideanLoss(nn.Module):
