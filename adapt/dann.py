@@ -34,7 +34,7 @@ class DANN:
         self.opt_model = opt
         self.opt_disc = torch.optim.Adam(
             self.discriminator.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'])
-        fabric.setup(self.discriminator, self.opt_disc)
+        self.discriminator, self.opt_disc = fabric.setup(self.discriminator, self.opt_disc)
         self.loss_class = copy.deepcopy(loss_fun)
         self.loss_domain = nn.CrossEntropyLoss()
         self.p = 0.0
@@ -44,13 +44,15 @@ class DANN:
         alpha = 2.0 / (1.0 + np.exp(-10 * self.p)) - 1
 
         class_output = model(X_data)
-        # TODO: This gradient reversal seems very unnecessary if we maintain two optimizers
         reverse_feature = ReverseLayerF.apply(model.features, alpha)
         domain_output = self.discriminator(reverse_feature)
         return class_output, domain_output
 
 
     def adapt(self, model, fabric, X_source, y_source, X_target, y_target=[]):
+        self.opt_model.zero_grad()
+        self.opt_disc.zero_grad()
+
         source_batch_size = X_source.shape[0]
         # Feeding in source inputs
         domain_label = utils.one_hot(torch.zeros(source_batch_size, device=fabric.device, dtype=torch.long), 2)
@@ -65,11 +67,10 @@ class DANN:
 
         err_t_domain = self.loss_domain(domain_output, domain_label)
         err = err_t_domain + err_s_domain + err_s_label
-        err.backward()
+
+        fabric.backward(err)
         self.opt_model.step()
-        self.opt_model.zero_grad()
         self.opt_disc.step()
-        self.opt_disc.zero_grad()
 
 
     def validate(self, model, fabric, X_train, y_train, X_shift):

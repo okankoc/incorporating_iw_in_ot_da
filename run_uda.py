@@ -46,15 +46,15 @@ def init_algorithm(config, name, model, loss_fun, opt, fabric):
     if name == 'wrr':
         alg = WRR(config['wrr'], fabric, model, loss_fun, opt)
     if name == 'weighted_wrr':
-        alg = WeightedWRR(config['weighted_wrr'], fabric, model, loss_fun, opt)
+        alg = WeightedWRR(config['weighted_wrr'], model, loss_fun, opt)
     if name == 'cons_wrr':
-        alg = ConstrainedWRR(config['cons_wrr'], fabric, model, loss_fun, opt)
+        alg = ConstrainedWRR(config['cons_wrr'], model, loss_fun, opt)
     if name == 'lje':
-        alg = OracleLJE(fabric, model, loss_fun, opt)
+        alg = OracleLJE(model, loss_fun, opt)
     if name == 'cc':
         alg = OracleCC(config['cc'], fabric, model, loss_fun, opt)
     if name == 'erm':
-        alg = ERM(fabric, model, loss_fun, opt)
+        alg = ERM(model, loss_fun, opt)
     if name == 'dann':
         alg = DANN(config['dann'], fabric, model, loss_fun, opt)
     if name == 'fdal':
@@ -73,6 +73,7 @@ def run_uda(config, model, scenario, loss_fun, fabric):
     for i in range(num_methods):
         for j in range(config['num_runs']):
             opt = init_opt(config, model)
+            model, opt = fabric.setup(model, opt)
             alg = init_algorithm(config, method_name, model, loss_fun, opt, fabric)
             print("===============================")
             print(f"Algorithm {alg.name}")
@@ -118,13 +119,13 @@ def debug_method(config, method, model, loss_fun, scenario, fabric, idx_des):
 def init_scenario(config, fabric):
     dataloader_options = {"batch_size": config['batch_size'], "shuffle": False, "drop_last": True}
     test_dataloader_options = {"batch_size": config['test_batch_size'], "shuffle": False, "drop_last": True}
-    if config['scenario'] == 'MNIST_to_USPS':
+    if config['scenario'] == 'MNIST_TO_USPS':
         scenario = shifts.MNIST_to_USPS(dataloader_options, test_dataloader_options, use_sampler=True, class_balanced=config['class_balanced'])
-    elif config['scenario'] == 'USPS_to_MNIST':
+    elif config['scenario'] == 'USPS_TO_MNIST':
         scenario = shifts.USPS_to_MNIST(dataloader_options, test_dataloader_options, use_sampler=True)
-    elif config['scenario'] == 'MNIST_to_MNIST_M':
+    elif config['scenario'] == 'MNIST_TO_MNIST_M':
         scenario = shifts.MNIST_to_MNIST_M(dataloader_options, test_dataloader_options, preprocess=False)
-    elif config['scenario'] == 'SVHN_to_MNIST':
+    elif config['scenario'] == 'SVHN_TO_MNIST':
         scenario = shifts.SVHN_to_MNIST(dataloader_options, test_dataloader_options, class_balanced=config['class_balanced'])
     elif config['scenario'] == 'CIFAR10C':
         scenario = shifts.CIFAR_CORRUPT(dataloader_options, test_dataloader_options, corruptions=["fog", "frost", "snow"])
@@ -212,7 +213,7 @@ def run_uda_experiments(fabric, config):
         else:
             model = utils.train_model_on_source(config, model, loss_fun, scenario, opt, fabric)
     else:
-        fabric.setup(model)
+        model = fabric.setup(model)
     # Report initial performance of a loaded source-trained model
     utils.report_metrics(scenario, model, loss_fun, config['report_source_train_risk'], config['report_target_train_risk'])
     model.save_params()
@@ -231,7 +232,7 @@ def plot_results(results, config):
         fig, ax = plt.subplots()
         for i, method in enumerate(methods):
             stds, means = torch.std_mean(results[i, :, :, m], dim=0)
-        ax.errorbar(x=np.arange(num_epochs), y=means, yerr=stds, label=method)
+            ax.errorbar(x=np.arange(num_epochs), y=means, yerr=stds, label=method)
         ax.legend(loc="upper right")
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
@@ -241,7 +242,7 @@ def plot_results(results, config):
 def setup_config():
     config = {
         # Experiment details
-        'device': 'cpu', # 'cpu' or 'auto' to find gpu automatically
+        'device': 'auto', # 'cpu' or 'auto' to find gpu automatically
 
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
         'model': 'MLP',
@@ -257,15 +258,15 @@ def setup_config():
         # Data loader options
         'batch_size': 64,
 
-        # Distribution shift scenario (MNIST_to_USPS, CIFAR10C, ...)
-        'scenario': 'MNIST_to_USPS',
+        # Distribution shift scenario (MNIST_TO_USPS, CIFAR10C, ...)
+        'scenario': 'MNIST_TO_USPS',
         'class_balanced': False,
-        'num_epochs': 10,
-        'num_runs': 5,
+        'num_epochs': 2,
+        'num_runs': 3,
         'algs': ['wrr', 'weighted_wrr'], # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
 
         # Debugging algorithms
-        'debug': True,
+        'debug': False,
         'print_every_n': 50,
         'report_source_train_risk': False,
         'report_target_train_risk': False,
@@ -360,6 +361,18 @@ def setup_alg_config(config):
     return config
 
 
+def run_all_experiments(fabric, config):
+    # Run all experiments
+    models = ['MLP', 'ConvNet']
+    scenarios = ['MNIST_TO_USPS', 'USPS_TO_MNIST', 'MNIST_TO_MNIST_M', 'SVHN_TO_MNIST']
+    for model in models:
+        for scenario in scenarios:
+            config['model'] = model
+            config['scenario'] = scenario
+            res = run_uda_experiments(fabric, config)
+            plot_results(res, config['algs'])
+
+
 if __name__ == "__main__":
     torch.set_default_dtype(torch.float32)
     # torch.set_printoptions(precision=3, sci_mode=False)
@@ -368,8 +381,14 @@ if __name__ == "__main__":
     config = setup_config()
     fabric = Fabric(accelerator=config['device'], devices="auto", strategy="auto")
     fabric.launch()
+
+    if fabric.global_rank != 0:
+        import builtins
+        builtins.print = lambda *args, **kwargs: None
+
     print(f"Fabric device: {fabric.device}")
-    reset_all(seed=config['seed'])
+    reset_all(seed=0)
 
     res = run_uda_experiments(fabric, config)
     plot_results(res, config['algs'])
+    # run_all_experiments(fabric, config)

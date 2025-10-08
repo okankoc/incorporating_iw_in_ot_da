@@ -10,7 +10,6 @@ class FDAL:
     def __init__(self, config, fabric, model, loss_fun, opt):
         self.name = "FDAL"
         print(f"Initializing {self.name}")
-        fabric.setup(model, opt)
         self.opt = opt
         backbone = nn.Sequential(model.net[:-1])
         bottleneck_dim = config['bottleneck_dim']

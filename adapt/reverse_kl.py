@@ -10,8 +10,7 @@ class ReverseKL():
         super(ReverseKL, self).__init__()
         self.loss_fun = copy.deepcopy(loss_fun)
         self.model = ProbModel(model)
-        fabric.setup(self.model, opt)
-        self.opt = opt
+        self.model, self.opt = fabric.setup(self.model, opt)
         self.name = "Reverse-KL"
         self.alpha_reverse = config['alpha_reverse']  # as the reverse-KL-regularizer scale
         self.alpha_forward = config['alpha_forward']

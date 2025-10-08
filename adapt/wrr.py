@@ -12,10 +12,9 @@ import ot      # We don't need POT if we don't need to compute entanglement!
 
 # Wasserstein Marginal Distance regularized source risk minimization using model outputs
 class WRR:
-    def __init__(self, config, fabric, model, loss_fun, opt):
+    def __init__(self, config, model, loss_fun, opt):
         self.loss_fun = copy.deepcopy(loss_fun)
         self.name = 'WRR'
-        fabric.setup(model, opt)
         self.opt = opt
         self.scale = config['scale']
         self.p = config['norm']

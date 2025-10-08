@@ -15,10 +15,9 @@ from sinkhorn_uot import mm_unbalanced
 
 # Weighted Wassertein regularized risk
 class WeightedWRR:
-    def __init__(self, config, fabric, model, loss_fun, opt):
+    def __init__(self, config, model, loss_fun, opt):
         self.loss_fun = copy.deepcopy(loss_fun)
         self.name = 'weighted-WRR'
-        fabric.setup(model, opt)
         self.opt = opt
         self.scale = config['scale']
         self.reg = config['entropy_reg']
@@ -31,6 +30,7 @@ class WeightedWRR:
         self.print_info = config['print_info']
         self.uot_iter_max = config['uot_iter_max']
         self.opt2 = torch.optim.Adam(model.parameters(), lr=self.opt.defaults['lr'], weight_decay=self.opt.defaults['weight_decay'])
+        model, self.opt2 = fabric.setup(model, self.opt2)
 
 
     def calc_loss(self, model, fabric, X_source, y_source, X_target):

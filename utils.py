@@ -52,11 +52,11 @@ def train_model_on_source(config, model, loss_fun, scenario, opt, fabric):
     try:
         # Load parameters from a file
         model.load_state_dict(torch.load(save_path, weights_only=True))
-        fabric.setup(model)
+        model = fabric.setup(model)
         log.info(f"Saved model found! Loading parameters from file: {save_path}")
     except:
         log.info(f"Either model has changed or save file {save_path} not found. Training from scratch...")
-        fabric.setup(model, opt)
+        model, opt = fabric.setup(model, opt)
         train(
             scenario.source_dataloader,
             model,
@@ -81,13 +81,13 @@ def train_model_on_source_and_target(config, model, loss_fun, scenario, opt, fab
     try:
         # Load parameters from a file
         model.load_state_dict(torch.load(save_path, weights_only=True))
-        fabric.setup(model)
+        model = fabric.setup(model)
         log.info(f"Saved model found! Loading parameters from file: {save_path}")
     except:
         log.info(f"Save file {save_path} not found. Training from scratch...")
         combined_data = torch.utils.data.ConcatDataset([scenario.source_data, scenario.target_data])
         dataloader = torch.utils.data.DataLoader(combined_data, **scenario.dataloader_options)
-        fabric.setup(model, opt)
+        model, opt = fabric.setup(model, opt)
         train(
             dataloader,
             model,

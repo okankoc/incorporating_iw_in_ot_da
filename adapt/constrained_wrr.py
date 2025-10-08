@@ -3,10 +3,9 @@ import copy
 import geomloss
 
 class ConstrainedWRR:
-    def __init__(self, config, fabric, model, loss_fun, opt):
+    def __init__(self, config, model, loss_fun, opt):
         self.loss_fun = copy.deepcopy(loss_fun)
         self.name = 'WRR'
-        fabric.setup(model, opt)
         self.opt = opt
         self.p = config['norm']
         self.reg = config['entropy_reg']

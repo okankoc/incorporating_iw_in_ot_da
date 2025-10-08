@@ -2,7 +2,7 @@ import torch
 import copy
 
 class ERM:
-    def __init__(self, fabric, model, loss_fun, opt):
+    def __init__(self, model, loss_fun, opt):
         self.mode = mode
         self.name = "ERM"
         print(f"Initializing {self.name}")

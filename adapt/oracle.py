@@ -4,7 +4,7 @@ import geomloss
 
 
 class OracleLJE:
-    def __init__(self, fabric, model, loss_fun, opt):
+    def __init__(self, model, loss_fun, opt):
         self.name = "LJE"  # low-joint-error
         print(f"Initializing Oracle as {self.name}")
         self.loss_fun = copy.deepcopy(loss_fun)
