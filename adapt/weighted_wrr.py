@@ -31,8 +31,7 @@ class WeightedWRR:
         self.separate_optim = config['separate_optim']
         if self.separate_optim is True:
             self.opt2 = torch.optim.Adam(model.parameters(), lr=self.opt.defaults['lr'], weight_decay=self.opt.defaults['weight_decay'])
-            model, opts = fabric.setup(model, [self.opt, self.opt2])
-            self.opt, self.opt2 = opts
+            model, self.opt, self.opt2 = fabric.setup(model, self.opt, self.opt2)
         else:
             model, self.opt = fabric.setup(model, self.opt)
 

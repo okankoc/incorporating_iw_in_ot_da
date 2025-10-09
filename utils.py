@@ -49,28 +49,20 @@ def report_metrics(scenario, model, loss_fun, report_source_train, report_target
 def train_model_on_source(config, model, loss_fun, scenario, opt, fabric):
     folder_path = "save_files/" + scenario.name + "/"
     save_path = folder_path + model.name + ".pth"
-    try:
-        # Load parameters from a file
-        model.load_state_dict(torch.load(save_path, weights_only=True))
-        model = fabric.setup(model)
-        log.info(f"Saved model found! Loading parameters from file: {save_path}")
-    except:
-        log.info(f"Either model has changed or save file {save_path} not found. Training from scratch...")
-        model, opt = fabric.setup(model, opt)
-        train(
-            scenario.source_dataloader,
-            model,
-            loss_fun,
-            opt,
-            config['num_pretrain_epochs'],
-            fabric,
-            report_every=10,
-        )
-        # Report accuracy/loss on whole training dataset
-        test(scenario.source_dataloader, model, loss_fun)
-        log.info(f"Saving parameters to file: {save_path}")
-        os.makedirs(folder_path, exist_ok=True)
-        torch.save(model.state_dict(), save_path)
+    train(
+        scenario.source_dataloader,
+        model,
+        loss_fun,
+        opt,
+        config['num_pretrain_epochs'],
+        fabric,
+        report_every=10,
+    )
+    # Report accuracy/loss on whole training dataset
+    test(scenario.source_dataloader, model, loss_fun)
+    log.info(f"Saving parameters to file: {save_path}")
+    os.makedirs(folder_path, exist_ok=True)
+    torch.save(model.state_dict(), save_path)
     return model
 
 
@@ -78,30 +70,22 @@ def train_model_on_source(config, model, loss_fun, scenario, opt, fabric):
 def train_model_on_source_and_target(config, model, loss_fun, scenario, opt, fabric):
     folder_path = "save_files/" + scenario.name + "/train_on_both/"
     save_path = folder_path + model.name + ".pth"
-    try:
-        # Load parameters from a file
-        model.load_state_dict(torch.load(save_path, weights_only=True))
-        model = fabric.setup(model)
-        log.info(f"Saved model found! Loading parameters from file: {save_path}")
-    except:
-        log.info(f"Save file {save_path} not found. Training from scratch...")
-        combined_data = torch.utils.data.ConcatDataset([scenario.source_data, scenario.target_data])
-        dataloader = torch.utils.data.DataLoader(combined_data, **scenario.dataloader_options)
-        model, opt = fabric.setup(model, opt)
-        train(
-            dataloader,
-            model,
-            loss_fun,
-            opt,
-            config['num_pretrain_epochs'],
-            fabric,
-            report_every=10,
-        )
-        # Report accuracy/loss on whole training dataset
-        test(scenario.source_dataloader, model, loss_fun)
-        log.info(f"Saving parameters to file: {save_path}")
-        os.makedirs(folder_path, exist_ok=True)
-        torch.save(model.state_dict(), save_path)
+    combined_data = torch.utils.data.ConcatDataset([scenario.source_data, scenario.target_data])
+    dataloader = torch.utils.data.DataLoader(combined_data, **scenario.dataloader_options)
+    train(
+        dataloader,
+        model,
+        loss_fun,
+        opt,
+        config['num_pretrain_epochs'],
+        fabric,
+        report_every=10,
+    )
+    # Report accuracy/loss on whole training dataset
+    test(scenario.source_dataloader, model, loss_fun)
+    log.info(f"Saving parameters to file: {save_path}")
+    os.makedirs(folder_path, exist_ok=True)
+    torch.save(model.state_dict(), save_path)
     return model
 
 

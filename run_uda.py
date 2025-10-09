@@ -64,15 +64,19 @@ def init_algorithm(config, name, model, loss_fun, opt, fabric):
     return alg
 
 
-def run_uda(config, model, scenario, loss_fun, fabric):
+def run_uda(config, fabric):
     # Run adaptation
+    loss_fun = config['loss']
+    scenario = init_scenario(config, fabric)
     methods = config['algs']
     num_methods = len(methods)
     num_epochs = config['num_epochs']
     num_runs = config['num_runs']
     results = torch.zeros(num_methods, num_runs, num_epochs, 4) # saving loss_source, acc_source, loss_target, acc_target
+    pretrain_model(config, fabric, scenario, loss_fun)
     for i in range(num_methods):
         for j in range(num_runs):
+            model = init_model(config, fabric, scenario, loss_fun)
             opt = init_opt(config, model)
             alg = init_algorithm(config, methods[i], model, loss_fun, opt, fabric)
             print("===============================")
@@ -94,7 +98,6 @@ def run_uda(config, model, scenario, loss_fun, fabric):
                 print("===============================")
                 print(f"Algorithm {alg.name}")
                 results[i, j, epoch, :] = utils.report_metrics(scenario, model, loss_fun, config['report_source_train_risk'], config['report_target_train_risk'])
-            model.restore_params()
     return results
 
 
@@ -153,7 +156,13 @@ def init_opt(config, model):
     return opt
 
 
-def init_model(config, scenario):
+def init_lazy_modules(model, scenario):
+    for X_source in scenario.source_dataloader:
+        model(X_source[0])
+        break
+
+
+def pretrain_model(config, fabric, scenario, loss_fun):
     if config['model'] == 'MLP':
         model = MLP(layer_sizes=[scenario.input_size, 200, 100, scenario.num_classes], f_nonlinear=nn.ReLU())
     elif config['model'] == 'ConvNet':
@@ -167,6 +176,57 @@ def init_model(config, scenario):
     elif config['model'] == 'ResNet':
         model = init_resnet(config['resnet_size'], scenario.num_classes)
 
+    init_lazy_modules(model, scenario)
+
+    print(f"Initialized model {model.name}")
+    folder_path = "save_files/" + scenario.name + "/"
+    save_path = folder_path + model.name + ".pth"
+    try:
+        # Load parameters from a file
+        model.load_state_dict(torch.load(save_path, weights_only=True))
+        print(f"Saved model found! Loading parameters from file: {save_path}")
+        model = fabric.setup(model)
+    except:
+        print(f"Saved model NOT found!")
+        if config['pretrain'] is True:
+            opt = init_opt(config, model)
+            model, opt = fabric.setup(model, opt)
+            print(f"Pretraining {config['num_pretrain_epochs']} epochs...")
+            if config['pretrain_on_both'] is True:
+                print('========= DEBUG MODE ON: USING TARGET LABELS TO PRETRAIN LJE ORACLE MODEL =======')
+                model = utils.train_model_on_source_and_target(config, model, loss_fun, scenario, opt, fabric)
+            else:
+                model = utils.train_model_on_source(config, model, loss_fun, scenario, opt, fabric)
+
+    # Report initial performance
+    utils.report_metrics(scenario, model, loss_fun, config['report_source_train_risk'], config['report_target_train_risk'])
+
+
+def init_model(config, fabric, scenario, loss_fun):
+    if config['model'] == 'MLP':
+        model = MLP(layer_sizes=[scenario.input_size, 200, 100, scenario.num_classes], f_nonlinear=nn.ReLU())
+    elif config['model'] == 'ConvNet':
+        model = ConvNet(num_classes=scenario.num_classes)
+    elif config['model'] == 'ConvNet2':
+        model = ConvNet2(num_classes=scenario.num_classes)
+    elif config['model'] == 'LeNet':
+        model = LeNet(num_classes=scenario.num_classes)
+    elif config['model'] == 'SmallCNN':
+        model = SmallCNN(num_classes=scenario.num_classes)
+    elif config['model'] == 'ResNet':
+        model = init_resnet(config['resnet_size'], scenario.num_classes)
+
+    print(f"Initialized model {model.name}")
+    folder_path = "save_files/" + scenario.name + "/"
+    save_path = folder_path + model.name + ".pth"
+    try:
+        # Load parameters from a file
+        model.load_state_dict(torch.load(save_path, weights_only=True))
+        print(f"Saved model found! Loading parameters from file: {save_path}")
+    except:
+        print(f"Saved model NOT found!")
+
+    model.train()
     if config['adapt_only_last_layer'] == True:
         num_layers = len(list(model.parameters()))
         for i, p in enumerate(model.parameters()):
@@ -199,26 +259,6 @@ def init_resnet(size, num_classes):
     model.save_params = types.MethodType(save_params, model)
     model.restore_params = types.MethodType(restore_params, model)
     return model
-
-
-def run_uda_experiments(fabric, config):
-    loss_fun = config['loss']
-    scenario = init_scenario(config, fabric)
-    model = init_model(config, scenario)
-    opt = init_opt(config, model)
-    if config['pretrain'] is True:
-        if config['pretrain_on_both'] is True:
-            print('========= DEBUG MODE ON: USING TARGET LABELS TO PRETRAIN LJE ORACLE MODEL =======')
-            model = utils.train_model_on_source_and_target(config, model, loss_fun, scenario, opt, fabric)
-        else:
-            model = utils.train_model_on_source(config, model, loss_fun, scenario, opt, fabric)
-    else:
-        model = fabric.setup(model)
-    # Report initial performance of a loaded source-trained model
-    utils.report_metrics(scenario, model, loss_fun, config['report_source_train_risk'], config['report_target_train_risk'])
-    model.save_params()
-    model.train()
-    return run_uda(config, model, scenario, loss_fun, fabric)
 
 
 def plot_results(results, config):
@@ -261,9 +301,9 @@ def setup_config():
         # Distribution shift scenario (MNIST_TO_USPS, CIFAR10C, ...)
         'scenario': 'MNIST_TO_USPS',
         'class_balanced': False,
-        'num_epochs': 2,
-        'num_runs': 1,
-        'algs': ['cc', 'wrr', 'weighted_wrr'], # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
+        'num_epochs': 5,
+        'num_runs': 3,
+        'algs': ['cc', 'wrr', 'weighted_wrr', 'dann'], # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
 
         # Debugging algorithms
         'debug': True,
@@ -368,7 +408,7 @@ def setup_alg_config(config):
     return config
 
 
-def run_all_experiments(fabric, config):
+def run_all_experiments(config, fabric):
     # Run all experiments
     models = ['MLP', 'ConvNet']
     scenarios = ['MNIST_TO_USPS', 'USPS_TO_MNIST', 'MNIST_TO_MNIST_M', 'SVHN_TO_MNIST']
@@ -376,7 +416,7 @@ def run_all_experiments(fabric, config):
         for scenario in scenarios:
             config['model'] = model
             config['scenario'] = scenario
-            res = run_uda_experiments(fabric, config)
+            res = run_uda(config, fabric)
             plot_results(res, config['algs'])
 
 
@@ -396,6 +436,6 @@ if __name__ == "__main__":
     print(f"Fabric device: {fabric.device}")
     reset_all(seed=0)
 
-    res = run_uda_experiments(fabric, config)
+    res = run_uda(config, fabric)
     # plot_results(res, config['algs'])
-    # run_all_experiments(fabric, config)
+    # run_all_experiments(config, fabric)
