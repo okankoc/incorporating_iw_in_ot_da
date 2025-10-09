@@ -1,14 +1,14 @@
 import torch
-import copy
 import geomloss
 
 
 class OracleLJE:
-    def __init__(self, model, loss_fun, opt):
+    def __init__(self, fabric, model, loss_fun, opt):
         self.name = "LJE"  # low-joint-error
         print(f"Initializing Oracle as {self.name}")
-        self.loss_fun = copy.deepcopy(loss_fun)
+        self.loss_fun = loss_fun
         self.opt = opt
+        model, self.opt = fabric.setup(model, self.opt)
 
     def adapt(self, config, model, fabric, X_source, y_source, X_target, y_target=[]):
         pred_source = model(X_source)
@@ -29,12 +29,13 @@ class OracleCC:
     def __init__(self, config, fabric, model, loss_fun, opt):
         self.name = "CC"  # close-conditionals
         print(f"Initializing Oracle as {self.name}")
-        self.loss_fun = copy.deepcopy(loss_fun)
+        self.loss_fun = loss_fun
         self.opt = opt
         self.reg = config['entropy_reg']
         self.p = config['norm']
         self.mode = config['mode'] # joint vs. weighted-joint vs. conditional
         self.add_source_loss = config['add_source_loss']
+        model, self.opt = fabric.setup(model, self.opt)
 
     def adapt(self, model, fabric, X_source, y_source, X_target, y_target=[]):
         pred_source = model(X_source)

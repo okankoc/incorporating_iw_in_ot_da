@@ -15,7 +15,7 @@ from sinkhorn_uot import mm_unbalanced
 
 # Weighted Wassertein regularized risk
 class WeightedWRR:
-    def __init__(self, config, model, loss_fun, opt):
+    def __init__(self, config, fabric, model, loss_fun, opt):
         self.loss_fun = copy.deepcopy(loss_fun)
         self.name = 'weighted-WRR'
         self.opt = opt
@@ -25,12 +25,16 @@ class WeightedWRR:
         self.add_source_loss = config['add_source_loss']
         self.uot_alg = config['uot_alg']
         self.uot_init = config['uot_init']
-        self.separate_optim = config['separate_optim']
         self.autograd_at_convergence = config['autograd_at_convergence']
         self.print_info = config['print_info']
         self.uot_iter_max = config['uot_iter_max']
-        self.opt2 = torch.optim.Adam(model.parameters(), lr=self.opt.defaults['lr'], weight_decay=self.opt.defaults['weight_decay'])
-        model, self.opt2 = fabric.setup(model, self.opt2)
+        self.separate_optim = config['separate_optim']
+        if self.separate_optim is True:
+            self.opt2 = torch.optim.Adam(model.parameters(), lr=self.opt.defaults['lr'], weight_decay=self.opt.defaults['weight_decay'])
+            model, opts = fabric.setup(model, [self.opt, self.opt2])
+            self.opt, self.opt2 = opts
+        else:
+            model, self.opt = fabric.setup(model, self.opt)
 
 
     def calc_loss(self, model, fabric, X_source, y_source, X_target):

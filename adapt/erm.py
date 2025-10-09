@@ -1,13 +1,13 @@
 import torch
-import copy
 
 class ERM:
-    def __init__(self, model, loss_fun, opt):
+    def __init__(self, fabric, model, loss_fun, opt):
         self.mode = mode
         self.name = "ERM"
         print(f"Initializing {self.name}")
-        self.loss_fun = copy.deepcopy(loss_fun)
+        self.loss_fun = loss_fun
         self.opt = opt
+        model, self.opt = fabric.setup(model, self.opt)
 
     def adapt(self, model, fabric, X_source, y_source, X_target, y_target=[]):
         pred_source = model(X_source)

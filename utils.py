@@ -43,7 +43,7 @@ def report_metrics(scenario, model, loss_fun, report_source_train, report_target
 
     print(f"Reporting accuracy/loss on {scenario.target_name} test dataset...")
     loss_target, acc_target = test(scenario.target_test_dataloader, model, loss_fun)
-    return loss_source, acc_source, loss_target, acc_target
+    return torch.tensor([loss_source, acc_source, loss_target, acc_target])
 
 
 def train_model_on_source(config, model, loss_fun, scenario, opt, fabric):

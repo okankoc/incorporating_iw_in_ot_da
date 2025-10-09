@@ -7,30 +7,32 @@ from fDAL import fDALLearner
 
 
 class FDAL:
-    def __init__(self, config, fabric, model, loss_fun, opt):
+    def __init__(self, config, fabric, model, loss_fun):
         self.name = "FDAL"
         print(f"Initializing {self.name}")
-        self.opt = opt
-        backbone = nn.Sequential(model.net[:-1])
-        bottleneck_dim = config['bottleneck_dim']
-        taskhead = nn.Sequential(
-            sn(nn.Linear(bottleneck_dim, bottleneck_dim)),
-            nn.LeakyReLU(),
-            nn.Dropout(config['dropout_prob']),
-            sn(nn.Linear(bottleneck_dim, model.num_classes)),
-        )
+        juncture = config['juncture']
+        backbone = model.net[:juncture]
+        taskhead = model.net[juncture:]
         self.clip_grad_val = config['clip_grad_val']
-        # taskhead = nn.Sequential(sn(model.net[-1]))
-        self.alg = fDALLearner(backbone, taskhead, loss_fun, divergence=config['divergence'], n_classes=model.num_classes).to(fabric.device)
-        self.alg.train()
+        if config['auxhead'] == 'none':
+            aux_head = None
+        else:
+            aux_head = config['auxhead']
+        self.learner = fDALLearner(backbone, taskhead, loss_fun, divergence=config['divergence'], n_classes=model.num_classes, aux_head=aux_head, grl_params=config['grl'])
+
+        # FDAL is different from other algorithms in that it keeps its own modules internally, unlike
+        # others which take a fixed model from outside!
+        self.opt = torch.optim.Adam(
+            self.learner.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'])
+        self.learner, self.opt = fabric.setup(self.learner, self.opt)
 
     def adapt(self, model, fabric, X_source, y_source, X_target, y_target=[]):
         self.opt.zero_grad()
-        loss, stats = self.alg((X_source, X_target), y_source)
-        # print(f"Task loss: {stats["taskloss"]}, fdal loss: {stats["fdal_loss"]}")
+        loss, stats = self.learner((X_source, X_target), y_source)
         fabric.backward(loss)
-        torch.nn.utils.clip_grad_norm(self.alg.parameters(), self.clip_grad_val)
+        torch.nn.utils.clip_grad_norm(self.learner.parameters(), self.clip_grad_val)
         self.opt.step()
+        # print(f"Task loss: {stats["taskloss"]}, fdal loss: {stats["fdal_loss"]}")
 
 
     def validate(self, model, fabric, X_source, y_source, X_target):

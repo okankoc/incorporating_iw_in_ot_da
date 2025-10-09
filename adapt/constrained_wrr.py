@@ -3,7 +3,7 @@ import copy
 import geomloss
 
 class ConstrainedWRR:
-    def __init__(self, config, model, loss_fun, opt):
+    def __init__(self, config, fabric, model, loss_fun, opt):
         self.loss_fun = copy.deepcopy(loss_fun)
         self.name = 'WRR'
         self.opt = opt
@@ -12,6 +12,7 @@ class ConstrainedWRR:
         self.thresh = config['thresh']
         self.scale = config['scale']
         self.mode = 0
+        model, self.opt = fabric.setup(model, self.opt)
 
     def calc_ot(self, f_source, f_target):
         num_source = f_source.shape[0]

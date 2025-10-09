@@ -46,19 +46,19 @@ def init_algorithm(config, name, model, loss_fun, opt, fabric):
     if name == 'wrr':
         alg = WRR(config['wrr'], fabric, model, loss_fun, opt)
     if name == 'weighted_wrr':
-        alg = WeightedWRR(config['weighted_wrr'], model, loss_fun, opt)
+        alg = WeightedWRR(config['weighted_wrr'], fabric, model, loss_fun, opt)
     if name == 'cons_wrr':
-        alg = ConstrainedWRR(config['cons_wrr'], model, loss_fun, opt)
+        alg = ConstrainedWRR(config['cons_wrr'], fabric, model, loss_fun, opt)
     if name == 'lje':
-        alg = OracleLJE(model, loss_fun, opt)
+        alg = OracleLJE(model, fabric, loss_fun, opt)
     if name == 'cc':
         alg = OracleCC(config['cc'], fabric, model, loss_fun, opt)
     if name == 'erm':
-        alg = ERM(model, loss_fun, opt)
+        alg = ERM(model, fabric, loss_fun, opt)
     if name == 'dann':
-        alg = DANN(config['dann'], fabric, model, loss_fun, opt)
+        alg = DANN(config['dann'], fabric, model, loss_fun)
     if name == 'fdal':
-        alg = FDAL(config['fdal'], fabric, model, loss_fun, opt)
+        alg = FDAL(config['fdal'], fabric, model, loss_fun)
     if name == 'reverse-kl':
         alg = ReverseKL(config['reverse_kl'], fabric, model, loss_fun, opt)
     return alg
@@ -68,13 +68,13 @@ def run_uda(config, model, scenario, loss_fun, fabric):
     # Run adaptation
     methods = config['algs']
     num_methods = len(methods)
-    num_epochs = len(config['num_epochs'])
+    num_epochs = config['num_epochs']
+    num_runs = config['num_runs']
     results = torch.zeros(num_methods, num_runs, num_epochs, 4) # saving loss_source, acc_source, loss_target, acc_target
     for i in range(num_methods):
-        for j in range(config['num_runs']):
+        for j in range(num_runs):
             opt = init_opt(config, model)
-            model, opt = fabric.setup(model, opt)
-            alg = init_algorithm(config, method_name, model, loss_fun, opt, fabric)
+            alg = init_algorithm(config, methods[i], model, loss_fun, opt, fabric)
             print("===============================")
             print(f"Algorithm {alg.name}")
             reset_all(seed=j)
@@ -245,11 +245,11 @@ def setup_config():
         'device': 'auto', # 'cpu' or 'auto' to find gpu automatically
 
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        'model': 'MLP',
+        'model': 'ConvNet',
         'resnet_size': 18, # 18 or 50
         'pretrain': True,
         'num_pretrain_epochs': 5, # if pretrain is True
-        'loss': MarginLoss(), #MarginLoss(), EuclideanLoss(), CrossEntropy
+        'loss': MarginLoss(), #MarginLoss(), EuclideanLoss(), CELoss()
         'optimizer': 'adam', # alternatives: adam, sgd
         'learning_rate': 1e-3, # use 1e-4 for ResNets or a learning scheduler
         'momentum': 0.9, # for SGD
@@ -262,12 +262,12 @@ def setup_config():
         'scenario': 'MNIST_TO_USPS',
         'class_balanced': False,
         'num_epochs': 2,
-        'num_runs': 3,
-        'algs': ['wrr', 'weighted_wrr'], # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
+        'num_runs': 1,
+        'algs': ['cc', 'wrr', 'weighted_wrr'], # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
 
         # Debugging algorithms
-        'debug': False,
-        'print_every_n': 50,
+        'debug': True,
+        'print_every_n': 100,
         'report_source_train_risk': False,
         'report_target_train_risk': False,
         'pretrain_on_both': False, # starting from a model that 'cheats'!
@@ -284,7 +284,7 @@ def setup_config():
         'calc_entanglement': False,
         'calc_margin': False,
         'calc_wrr': True,
-        'calc_weighted_wrr': True,
+        'calc_weighted_wrr': False,
         'verbose_weighted_wrr': False,
         'calc_weight_info': False,
         'calc_grad_info': False,
@@ -327,15 +327,22 @@ def setup_alg_config(config):
         }
 
     dann_config = {
-        'layer_to_apply_disc': 'flatten', # -2 for MLP
-        'discriminator': ConvDomainClassifier(), # or MLP([100, 10, 2], nn.ReLU())
+        'layer_to_apply_disc': 'flatten', #'flatten' for Conv or -2 for MLP
+        'discriminator': ConvDomainClassifier(), # ConvDomainClassifier() or MLP([100, 10, 2], nn.ReLU())
+        'learning_rate': 1e-3, # for the internal optimizer
+        'weight_decay': 0.0,
+        'num_epochs': 2,
+        'num_batches': 1000, # rough estimate should be enough
         }
 
     fdal_config = {
+        'juncture': -1, # For now we keep backbone/taskhead juncture at the last layer only
+        'auxhead': ConvDomainClassifier(), # This seems to be necessary to prevent blowing up!
+        'grl': {"max_iters": 3000, "hi": 0.6, "auto_step": True},
         'divergence': 'pearson',
-        'bottleneck_dim': 100,
-        'dropout_prob': 0.5,
-        'clip_grad_val': 1,
+        'learning_rate': 1e-3, # for the internal optimizer
+        'weight_decay': 0.0,
+        'clip_grad_val': 10,
     }
 
     cc_config = {
@@ -390,5 +397,5 @@ if __name__ == "__main__":
     reset_all(seed=0)
 
     res = run_uda_experiments(fabric, config)
-    plot_results(res, config['algs'])
+    # plot_results(res, config['algs'])
     # run_all_experiments(fabric, config)
