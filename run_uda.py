@@ -26,7 +26,7 @@ from adapt.reverse_kl import ReverseKL
 from adapt.debug import debug_model
 from models.conv import ConvNet, ConvNet2, LeNet, SmallCNN, ConvDomainClassifier
 from models.mlp import MultiLayerPerceptron as MLP
-
+from setup_config import setup_config
 
 def reset_all(seed):
     # Python & NumPy
@@ -68,20 +68,24 @@ def run_uda(config, fabric):
     # Run adaptation
     loss_fun = config['loss']
     scenario = init_scenario(config, fabric)
+    model = init_model(config, scenario)
+    init_lazy_modules(model, scenario)
+    scenario = setup_fabric_dataloaders(fabric, scenario)
+    pretrain_model(model, config, fabric, scenario, loss_fun)
+
     methods = config['algs']
     num_methods = len(methods)
     num_epochs = config['num_epochs']
     num_runs = config['num_runs']
     results = torch.zeros(num_methods, num_runs, num_epochs, 4) # saving loss_source, acc_source, loss_target, acc_target
-    pretrain_model(config, fabric, scenario, loss_fun)
     for i in range(num_methods):
         for j in range(num_runs):
-            model = init_model(config, fabric, scenario, loss_fun)
+            reset_all(seed=j)
+            model = load_model(config, fabric, scenario, loss_fun)
             opt = init_opt(config, model)
             alg = init_algorithm(config, methods[i], model, loss_fun, opt, fabric)
             print("===============================")
             print(f"Algorithm {alg.name}")
-            reset_all(seed=j)
             for epoch in range(num_epochs):
                 batch_idx = 0
                 print(f"Epoch {epoch+1}")
@@ -138,10 +142,6 @@ def init_scenario(config, fabric):
         scenario = shifts.OFFICEHOME(dataloader_options, test_dataloader_options, size=(224,224))
     else:
         raise Exception('Unknown scenario')
-    scenario.source_dataloader = fabric.setup_dataloaders(scenario.source_dataloader)
-    scenario.target_dataloader = fabric.setup_dataloaders(scenario.target_dataloader)
-    scenario.source_test_dataloader = fabric.setup_dataloaders(scenario.source_test_dataloader)
-    scenario.target_test_dataloader = fabric.setup_dataloaders(scenario.target_test_dataloader)
     return scenario
 
 
@@ -161,24 +161,15 @@ def init_lazy_modules(model, scenario):
         model(X_source[0])
         break
 
+def setup_fabric_dataloaders(fabric, scenario):
+    scenario.source_dataloader = fabric.setup_dataloaders(scenario.source_dataloader)
+    scenario.target_dataloader = fabric.setup_dataloaders(scenario.target_dataloader)
+    scenario.source_test_dataloader = fabric.setup_dataloaders(scenario.source_test_dataloader)
+    scenario.target_test_dataloader = fabric.setup_dataloaders(scenario.target_test_dataloader)
+    return scenario
 
-def pretrain_model(config, fabric, scenario, loss_fun):
-    if config['model'] == 'MLP':
-        model = MLP(layer_sizes=[scenario.input_size, 200, 100, scenario.num_classes], f_nonlinear=nn.ReLU())
-    elif config['model'] == 'ConvNet':
-        model = ConvNet(num_classes=scenario.num_classes)
-    elif config['model'] == 'ConvNet2':
-        model = ConvNet2(num_classes=scenario.num_classes)
-    elif config['model'] == 'LeNet':
-        model = LeNet(num_classes=scenario.num_classes)
-    elif config['model'] == 'SmallCNN':
-        model = SmallCNN(num_classes=scenario.num_classes)
-    elif config['model'] == 'ResNet':
-        model = init_resnet(config['resnet_size'], scenario.num_classes)
 
-    init_lazy_modules(model, scenario)
-
-    print(f"Initialized model {model.name}")
+def pretrain_model(model, config, fabric, scenario, loss_fun):
     folder_path = "save_files/" + scenario.name + "/"
     save_path = folder_path + model.name + ".pth"
     try:
@@ -202,7 +193,7 @@ def pretrain_model(config, fabric, scenario, loss_fun):
     utils.report_metrics(scenario, model, loss_fun, config['report_source_train_risk'], config['report_target_train_risk'])
 
 
-def init_model(config, fabric, scenario, loss_fun):
+def init_model(config, scenario):
     if config['model'] == 'MLP':
         model = MLP(layer_sizes=[scenario.input_size, 200, 100, scenario.num_classes], f_nonlinear=nn.ReLU())
     elif config['model'] == 'ConvNet':
@@ -215,8 +206,12 @@ def init_model(config, fabric, scenario, loss_fun):
         model = SmallCNN(num_classes=scenario.num_classes)
     elif config['model'] == 'ResNet':
         model = init_resnet(config['resnet_size'], scenario.num_classes)
-
     print(f"Initialized model {model.name}")
+    return model
+
+
+def load_model(config, fabric, scenario, loss_fun):
+    model = init_model(config, scenario)
     folder_path = "save_files/" + scenario.name + "/"
     save_path = folder_path + model.name + ".pth"
     try:
@@ -279,135 +274,6 @@ def plot_results(results, config):
         plt.savefig(save_name + ".pdf", format="pdf")
 
 
-def setup_config():
-    config = {
-        # Experiment details
-        'device': 'auto', # 'cpu' or 'auto' to find gpu automatically
-
-        # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        'model': 'ConvNet',
-        'resnet_size': 18, # 18 or 50
-        'pretrain': True,
-        'num_pretrain_epochs': 5, # if pretrain is True
-        'loss': MarginLoss(), #MarginLoss(), EuclideanLoss(), CELoss()
-        'optimizer': 'adam', # alternatives: adam, sgd
-        'learning_rate': 1e-3, # use 1e-4 for ResNets or a learning scheduler
-        'momentum': 0.9, # for SGD
-        'weight_decay': 0.0,
-
-        # Data loader options
-        'batch_size': 64,
-
-        # Distribution shift scenario (MNIST_TO_USPS, CIFAR10C, ...)
-        'scenario': 'MNIST_TO_USPS',
-        'class_balanced': False,
-        'num_epochs': 5,
-        'num_runs': 3,
-        'algs': ['cc', 'wrr', 'weighted_wrr', 'dann'], # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
-
-        # Debugging algorithms
-        'debug': True,
-        'print_every_n': 100,
-        'report_source_train_risk': False,
-        'report_target_train_risk': False,
-        'pretrain_on_both': False, # starting from a model that 'cheats'!
-        'adapt_only_last_layer': False,
-
-        # Test set dataloader options
-        'test_batch_size': 512,
-        'checkpoint': False,
-        'validate': False,
-    }
-
-    debug_config = {
-        'calc_label_shift': False,
-        'calc_entanglement': False,
-        'calc_margin': False,
-        'calc_wrr': True,
-        'calc_weighted_wrr': False,
-        'verbose_weighted_wrr': False,
-        'calc_weight_info': False,
-        'calc_grad_info': False,
-        }
-
-    config['debug_options'] = debug_config
-
-    # Algorithms and their hyperparameters/options
-    config = setup_alg_config(config)
-    return config
-
-
-def setup_alg_config(config):
-    wrr_config = {
-        'scale': 1.0,
-        'norm': 2,
-        'entropy_reg': 1e-3,
-        'propagate_labels': False,
-        'print_info': False,
-        }
-
-    weighted_wrr_config = {
-        'scale': 1.0,
-        'entropy_reg': 1e-1,
-        'add_source_loss': True,
-        'separate_optim': True,
-        'uot_alg': 'mm', # sinkhorn or mm
-        'uot_init': False, # initialize MM with semi-relaxed UOT
-        'uot_iter_max': 1000,
-        'autograd_at_convergence': True,
-        'reg_m': (1.0, 100.0),
-        'print_info': False,
-        }
-
-    cons_wrr_config = {
-        'norm': 2,
-        'entropy_reg': 1e-3,
-        'scale': 1.0,
-        'thresh': 0.01
-        }
-
-    dann_config = {
-        'layer_to_apply_disc': 'flatten', #'flatten' for Conv or -2 for MLP
-        'discriminator': ConvDomainClassifier(), # ConvDomainClassifier() or MLP([100, 10, 2], nn.ReLU())
-        'learning_rate': 1e-3, # for the internal optimizer
-        'weight_decay': 0.0,
-        'num_epochs': 2,
-        'num_batches': 1000, # rough estimate should be enough
-        }
-
-    fdal_config = {
-        'juncture': -1, # For now we keep backbone/taskhead juncture at the last layer only
-        'auxhead': ConvDomainClassifier(), # This seems to be necessary to prevent blowing up!
-        'grl': {"max_iters": 3000, "hi": 0.6, "auto_step": True},
-        'divergence': 'pearson',
-        'learning_rate': 1e-3, # for the internal optimizer
-        'weight_decay': 0.0,
-        'clip_grad_val': 10,
-    }
-
-    cc_config = {
-        'entropy_reg': 1e-3,
-        'norm': 2,
-        'mode': 'joint', # or 'weighted_joint' or 'conditional'
-        'add_source_loss': False, # only for weighted_joint
-        }
-
-    reverse_kl_config = {
-        'alpha_reverse': 0.1,
-        'alpha_forward': 0.1,
-        'augment_softmax': 0.0,
-    }
-
-    config['wrr'] = wrr_config
-    config['weighted_wrr'] = weighted_wrr_config
-    config['cons_wrr'] = cons_wrr_config
-    config['dann'] = dann_config
-    config['fdal'] = fdal_config
-    config['cc'] = cc_config
-    config['reverse_kl'] = reverse_kl_config
-    return config
-
-
 def run_all_experiments(config, fabric):
     # Run all experiments
     models = ['MLP', 'ConvNet']
@@ -437,5 +303,5 @@ if __name__ == "__main__":
     reset_all(seed=0)
 
     res = run_uda(config, fabric)
-    # plot_results(res, config['algs'])
+    plot_results(res, config['algs'])
     # run_all_experiments(config, fabric)
