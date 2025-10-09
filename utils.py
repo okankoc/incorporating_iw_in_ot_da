@@ -9,40 +9,50 @@ def one_hot(x, k):
     return torch.nn.functional.one_hot(x, k).float()
 
 
-def test(dataloader, model, loss_fun):
-    num_batches = len(dataloader)
+def test(dataloader, model, loss_fun, fabric):
     model.eval()
     test_loss, correct = 0, 0
     num_points = 0
-    # We can't use this when we use a sampler to up/downsample the dataset!!!
-    # num_inputs = len(dataloader.dataset)
     with torch.no_grad():
         for X, y in dataloader:
             pred = model(X)
-            test_loss += loss_fun(pred, one_hot(y, model.num_classes)).item()
-            correct += (pred.argmax(1) == y).type(torch.float).sum().item()
-            num_points += y.shape[0]
-    test_loss /= num_batches
-    correct /= num_points
-    print(f"Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
+            test_loss += loss_fun(pred, one_hot(y, model.num_classes)).item() * y.size(
+                0
+            )
+            correct += (pred.argmax(1) == y).sum() * y.size(0)
+            num_points += y.size(0)
+    test_loss = fabric.all_reduce(test_loss, reduce_op='sum')
+    correct = fabric.all_reduce(correct, reduce_op='sum')
+    num_points = fabric.all_reduce(num_points, reduce_op='sum')
+    print(f"Accuracy: {(100*correct/num_points):0.2f}%, Avg loss: {test_loss/num_points:.6f} \n")
     return test_loss, correct
 
 
-def report_metrics(scenario, model, loss_fun, report_source_train, report_target_train):
+def report_metrics(
+    scenario, model, loss_fun, report_source_train, report_target_train, fabric
+):
     # These are very slow
     if report_source_train:
-        print(f"Reporting accuracy/loss on source {scenario.source_name} training dataset...")
-        test(scenario.source_dataloader, model, loss_fun)
+        print(
+            f"Reporting accuracy/loss on source {scenario.source_name} training dataset..."
+        )
+        test(scenario.source_dataloader, model, loss_fun, fabric)
 
     if report_target_train:
-        print(f"Reporting accuracy/loss on target {scenario.target_name} training dataset...")
-        test(scenario.target_dataloader, model, loss_fun)
+        print(
+            f"Reporting accuracy/loss on target {scenario.target_name} training dataset..."
+        )
+        test(scenario.target_dataloader, model, loss_fun, fabric)
 
     print(f"Reporting accuracy/loss on {scenario.source_name} test dataset...")
-    loss_source, acc_source = test(scenario.source_test_dataloader, model, loss_fun)
+    loss_source, acc_source = test(
+        scenario.source_test_dataloader, model, loss_fun, fabric
+    )
 
     print(f"Reporting accuracy/loss on {scenario.target_name} test dataset...")
-    loss_target, acc_target = test(scenario.target_test_dataloader, model, loss_fun)
+    loss_target, acc_target = test(
+        scenario.target_test_dataloader, model, loss_fun, fabric
+    )
     return torch.tensor([loss_source, acc_source, loss_target, acc_target])
 
 
@@ -54,12 +64,12 @@ def train_model_on_source(config, model, loss_fun, scenario, opt, fabric):
         model,
         loss_fun,
         opt,
-        config['num_pretrain_epochs'],
+        config["num_pretrain_epochs"],
         fabric,
         report_every=10,
     )
     # Report accuracy/loss on whole training dataset
-    test(scenario.source_dataloader, model, loss_fun)
+    test(scenario.source_dataloader, model, loss_fun, fabric)
     log.info(f"Saving parameters to file: {save_path}")
     os.makedirs(folder_path, exist_ok=True)
     torch.save(model.state_dict(), save_path)
@@ -70,26 +80,39 @@ def train_model_on_source(config, model, loss_fun, scenario, opt, fabric):
 def train_model_on_source_and_target(config, model, loss_fun, scenario, opt, fabric):
     folder_path = "save_files/" + scenario.name + "/train_on_both/"
     save_path = folder_path + model.name + ".pth"
-    combined_data = torch.utils.data.ConcatDataset([scenario.source_data, scenario.target_data])
-    dataloader = torch.utils.data.DataLoader(combined_data, **scenario.dataloader_options)
+    combined_data = torch.utils.data.ConcatDataset(
+        [scenario.source_data, scenario.target_data]
+    )
+    dataloader = torch.utils.data.DataLoader(
+        combined_data, **scenario.dataloader_options
+    )
     train(
         dataloader,
         model,
         loss_fun,
         opt,
-        config['num_pretrain_epochs'],
+        config["num_pretrain_epochs"],
         fabric,
         report_every=10,
     )
     # Report accuracy/loss on whole training dataset
-    test(scenario.source_dataloader, model, loss_fun)
+    test(scenario.source_dataloader, model, loss_fun, fabric)
     log.info(f"Saving parameters to file: {save_path}")
     os.makedirs(folder_path, exist_ok=True)
     torch.save(model.state_dict(), save_path)
     return model
 
 
-def train(dataloader, model, loss_fun, optimizer, num_epochs, fabric, report_every=1, report_metrics=True):
+def train(
+    dataloader,
+    model,
+    loss_fun,
+    optimizer,
+    num_epochs,
+    fabric,
+    report_every=1,
+    report_metrics=True,
+):
     size = len(dataloader.dataset)
     t0 = time.perf_counter()
     model.train()
@@ -106,5 +129,5 @@ def train(dataloader, model, loss_fun, optimizer, num_epochs, fabric, report_eve
                 print(f"loss: {loss:>7f} epoch:{epoch+1} [{current:>5d}/{size:>5d}]")
         if report_metrics is True:
             print("Train dataset metrics:")
-            test(dataloader, model, loss_fun)
+            test(dataloader, model, loss_fun, fabric)
     print(f"Method took {time.perf_counter() - t0} sec")

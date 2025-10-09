@@ -66,19 +66,31 @@ class ConvNet(nn.Module):
         self.features = []
         self.net = nn.Sequential()
         self.name = "conv1_max"
-        self.net.add_module("conv1", nn.LazyConv2d(32, kernel_size=3, stride=1, padding="same"))
+        self.net.add_module(
+            "conv1", nn.LazyConv2d(32, kernel_size=3, stride=1, padding="same")
+        )
         self.net.add_module("relu1", nn.ReLU(True))
-        self.net.add_module("conv2", nn.Conv2d(32, 32, kernel_size=3, stride=1, padding="same"))
+        self.net.add_module(
+            "conv2", nn.Conv2d(32, 32, kernel_size=3, stride=1, padding="same")
+        )
         self.net.add_module("relu2", nn.ReLU(True))
         self.net.add_module("pool1", nn.MaxPool2d(kernel_size=2, stride=2))
-        self.net.add_module("conv3", nn.Conv2d(32, 64, kernel_size=3, stride=1, padding="same"))
+        self.net.add_module(
+            "conv3", nn.Conv2d(32, 64, kernel_size=3, stride=1, padding="same")
+        )
         self.net.add_module("relu3", nn.ReLU(True))
-        self.net.add_module("conv4", nn.Conv2d(64, 64, kernel_size=3, stride=1, padding="same"))
+        self.net.add_module(
+            "conv4", nn.Conv2d(64, 64, kernel_size=3, stride=1, padding="same")
+        )
         self.net.add_module("relu4", nn.ReLU(True))
         self.net.add_module("pool2", nn.MaxPool2d(kernel_size=2, stride=2))
-        self.net.add_module("conv5", nn.Conv2d(64, 128, kernel_size=3, stride=1, padding="same"))
+        self.net.add_module(
+            "conv5", nn.Conv2d(64, 128, kernel_size=3, stride=1, padding="same")
+        )
         self.net.add_module("relu5", nn.ReLU(True))
-        self.net.add_module("conv6", nn.Conv2d(128, 128, kernel_size=3, stride=1, padding="same"))
+        self.net.add_module(
+            "conv6", nn.Conv2d(128, 128, kernel_size=3, stride=1, padding="same")
+        )
         self.net.add_module("relu6", nn.ReLU(True))
         self.net.add_module("pool3", nn.MaxPool2d(kernel_size=2, stride=2))
         self.net.add_module("flatten", nn.Flatten())
@@ -162,10 +174,14 @@ class SmallCNN(nn.Module):
         self.num_classes = num_classes
         self.name = "small_cnn"
         self.net = nn.Sequential()
-        self.net.add_module("conv1", nn.LazyConv2d(32, kernel_size=3, stride=1, padding=1))
+        self.net.add_module(
+            "conv1", nn.LazyConv2d(32, kernel_size=3, stride=1, padding=1)
+        )
         self.net.add_module("relu1", nn.ReLU())
         self.net.add_module("max_pool1", nn.MaxPool2d(kernel_size=2))
-        self.net.add_module("conv2", nn.LazyConv2d(64, kernel_size=3, stride=1, padding=1))
+        self.net.add_module(
+            "conv2", nn.LazyConv2d(64, kernel_size=3, stride=1, padding=1)
+        )
         self.net.add_module("relu2", nn.ReLU())
         self.net.add_module("max_pool2", nn.MaxPool2d(kernel_size=2))
         self.net.add_module("flatten", nn.Flatten())

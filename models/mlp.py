@@ -25,13 +25,11 @@ class MultiLayerPerceptron(nn.Module):
                 self.net.add_module(f"activation{i}", f_nonlinear)
         self.features = None
 
-
     def copy(self, device):
         new_model = MultiLayerPerceptron(self.layer_sizes, self.activation).to(device)
         new_model.load_state_dict(self.state_dict())
         new_model.save_params()
         return new_model
-
 
     @torch.no_grad()
     def save_params(self):
@@ -42,14 +40,13 @@ class MultiLayerPerceptron(nn.Module):
         self.load_state_dict(self.state)
         return dict(self.named_parameters())
 
-
     # Call model after this function to get layer outputs
     def track_features(self, layer_id):
         # Register hooks for the layers you're interested in
         def fun(module, inputs, outputs):
             self.features = outputs
-        hook = self.net[layer_id].register_forward_hook(fun)
 
+        hook = self.net[layer_id].register_forward_hook(fun)
 
     # In the forward compute, we store also the intermediate pre/post-activation layer features
     def forward(self, x):

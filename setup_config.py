@@ -5,55 +5,55 @@ from models.conv import ConvDomainClassifier
 def setup_config():
     config = {
         # Experiment details
-        'device': 'auto', # 'cpu' or 'auto' to find gpu automatically
-
+        "device": "auto",  # 'cpu' or 'auto' to find gpu automatically
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        'model': 'ConvNet',
-        'resnet_size': 18, # 18 or 50
-        'pretrain': True,
-        'num_pretrain_epochs': 5, # if pretrain is True
-        'loss': MarginLoss(), #MarginLoss(), EuclideanLoss(), CELoss()
-        'optimizer': 'adam', # alternatives: adam, sgd
-        'learning_rate': 1e-3, # use 1e-4 for ResNets or a learning scheduler
-        'momentum': 0.9, # for SGD
-        'weight_decay': 0.0,
-
+        "model": "ConvNet",
+        "resnet_size": 18,  # 18 or 50
+        "pretrain": True,
+        "num_pretrain_epochs": 5,  # if pretrain is True
+        "loss": MarginLoss(),  # MarginLoss(), EuclideanLoss(), CELoss()
+        "optimizer": "adam",  # alternatives: adam, sgd
+        "learning_rate": 1e-3,  # use 1e-4 for ResNets or a learning scheduler
+        "momentum": 0.9,  # for SGD
+        "weight_decay": 0.0,
         # Data loader options
-        'batch_size': 64,
-
+        "batch_size": 64,
         # Distribution shift scenario (MNIST_TO_USPS, CIFAR10C, ...)
-        'scenario': 'MNIST_TO_USPS',
-        'class_balanced': False,
-        'num_epochs': 5,
-        'num_runs': 3,
-        'algs': ['cc', 'wrr', 'weighted_wrr', 'dann'], # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
-
+        "scenario": "MNIST_TO_USPS",
+        "class_balanced": False,
+        "num_epochs": 5,
+        "num_runs": 3,
+        "algs": [
+            "cc",
+            "wrr",
+            "weighted_wrr",
+            "dann",
+        ],  # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
         # Debugging algorithms
-        'debug': True,
-        'print_every_n': 100,
-        'report_source_train_risk': False,
-        'report_target_train_risk': False,
-        'pretrain_on_both': False, # starting from a model that 'cheats'!
-        'adapt_only_last_layer': False,
-
+        "debug": True,
+        "print_every_n": 100,
+        "report_source_train_risk": False,
+        "report_target_train_risk": False,
+        "pretrain_on_both": False,  # starting from a model that 'cheats'!
+        "adapt_only_last_layer": False,
         # Test set dataloader options
-        'test_batch_size': 512,
-        'checkpoint': False,
-        'validate': False,
+        "test_batch_size": 512,
+        "checkpoint": False,
+        "validate": False,
     }
 
     debug_config = {
-        'calc_label_shift': False,
-        'calc_entanglement': False,
-        'calc_margin': False,
-        'calc_wrr': True,
-        'calc_weighted_wrr': False,
-        'verbose_weighted_wrr': False,
-        'calc_weight_info': False,
-        'calc_grad_info': False,
-        }
+        "calc_label_shift": False,
+        "calc_entanglement": False,
+        "calc_margin": False,
+        "calc_wrr": True,
+        "calc_weighted_wrr": False,
+        "verbose_weighted_wrr": False,
+        "calc_weight_info": False,
+        "calc_grad_info": False,
+    }
 
-    config['debug_options'] = debug_config
+    config["debug_options"] = debug_config
 
     # Algorithms and their hyperparameters/options
     config = setup_alg_config(config)
@@ -62,70 +62,65 @@ def setup_config():
 
 def setup_alg_config(config):
     wrr_config = {
-        'scale': 1.0,
-        'norm': 2,
-        'entropy_reg': 1e-3,
-        'propagate_labels': False,
-        'print_info': False,
-        }
+        "scale": 1.0,
+        "norm": 2,
+        "entropy_reg": 1e-3,
+        "propagate_labels": False,
+        "print_info": False,
+    }
 
     weighted_wrr_config = {
-        'scale': 1.0,
-        'entropy_reg': 1e-1,
-        'add_source_loss': True,
-        'separate_optim': True,
-        'uot_alg': 'mm', # sinkhorn or mm
-        'uot_init': False, # initialize MM with semi-relaxed UOT
-        'uot_iter_max': 1000,
-        'autograd_at_convergence': True,
-        'reg_m': (1.0, 100.0),
-        'print_info': False,
-        }
+        "scale": 1.0,
+        "entropy_reg": 1e-1,
+        "add_source_loss": True,
+        "separate_optim": True,
+        "uot_alg": "mm",  # sinkhorn or mm
+        "uot_init": False,  # initialize MM with semi-relaxed UOT
+        "uot_iter_max": 1000,
+        "autograd_at_convergence": True,
+        "reg_m": (1.0, 100.0),
+        "print_info": False,
+    }
 
-    cons_wrr_config = {
-        'norm': 2,
-        'entropy_reg': 1e-3,
-        'scale': 1.0,
-        'thresh': 0.01
-        }
+    cons_wrr_config = {"norm": 2, "entropy_reg": 1e-3, "scale": 1.0, "thresh": 0.01}
 
     dann_config = {
-        'layer_to_apply_disc': 'flatten', #'flatten' for Conv or -2 for MLP
-        'discriminator': ConvDomainClassifier(), # ConvDomainClassifier() or MLP([100, 10, 2], nn.ReLU())
-        'learning_rate': 1e-3, # for the internal optimizer
-        'weight_decay': 0.0,
-        'num_epochs': 2,
-        'num_batches': 1000, # rough estimate should be enough
-        }
+        "layer_to_apply_disc": "flatten",  #'flatten' for Conv or -2 for MLP
+        "discriminator": ConvDomainClassifier(),  # ConvDomainClassifier() or MLP([100, 10, 2], nn.ReLU())
+        "learning_rate": 1e-3,  # for the internal optimizer
+        "weight_decay": 0.0,
+        "num_epochs": 2,
+        "num_batches": 1000,  # rough estimate should be enough
+    }
 
     fdal_config = {
-        'juncture': -1, # For now we keep backbone/taskhead juncture at the last layer only
-        'auxhead': ConvDomainClassifier(), # This seems to be necessary to prevent blowing up!
-        'grl': {"max_iters": 3000, "hi": 0.6, "auto_step": True},
-        'divergence': 'pearson',
-        'learning_rate': 1e-3, # for the internal optimizer
-        'weight_decay': 0.0,
-        'clip_grad_val': 10,
+        "juncture": -1,  # For now we keep backbone/taskhead juncture at the last layer only
+        "auxhead": ConvDomainClassifier(),  # This seems to be necessary to prevent blowing up!
+        "grl": {"max_iters": 3000, "hi": 0.6, "auto_step": True},
+        "divergence": "pearson",
+        "learning_rate": 1e-3,  # for the internal optimizer
+        "weight_decay": 0.0,
+        "clip_grad_val": 10,
     }
 
     cc_config = {
-        'entropy_reg': 1e-3,
-        'norm': 2,
-        'mode': 'joint', # or 'weighted_joint' or 'conditional'
-        'add_source_loss': False, # only for weighted_joint
-        }
-
-    reverse_kl_config = {
-        'alpha_reverse': 0.1,
-        'alpha_forward': 0.1,
-        'augment_softmax': 0.0,
+        "entropy_reg": 1e-3,
+        "norm": 2,
+        "mode": "joint",  # or 'weighted_joint' or 'conditional'
+        "add_source_loss": False,  # only for weighted_joint
     }
 
-    config['wrr'] = wrr_config
-    config['weighted_wrr'] = weighted_wrr_config
-    config['cons_wrr'] = cons_wrr_config
-    config['dann'] = dann_config
-    config['fdal'] = fdal_config
-    config['cc'] = cc_config
-    config['reverse_kl'] = reverse_kl_config
+    reverse_kl_config = {
+        "alpha_reverse": 0.1,
+        "alpha_forward": 0.1,
+        "augment_softmax": 0.0,
+    }
+
+    config["wrr"] = wrr_config
+    config["weighted_wrr"] = weighted_wrr_config
+    config["cons_wrr"] = cons_wrr_config
+    config["dann"] = dann_config
+    config["fdal"] = fdal_config
+    config["cc"] = cc_config
+    config["reverse_kl"] = reverse_kl_config
     return config

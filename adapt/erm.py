@@ -1,5 +1,6 @@
 import torch
 
+
 class ERM:
     def __init__(self, fabric, model, loss_fun, opt):
         self.mode = mode

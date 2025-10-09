@@ -2,15 +2,16 @@ import torch
 import copy
 import geomloss
 
+
 class ConstrainedWRR:
     def __init__(self, config, fabric, model, loss_fun, opt):
         self.loss_fun = copy.deepcopy(loss_fun)
-        self.name = 'WRR'
+        self.name = "WRR"
         self.opt = opt
-        self.p = config['norm']
-        self.reg = config['entropy_reg']
-        self.thresh = config['thresh']
-        self.scale = config['scale']
+        self.p = config["norm"]
+        self.reg = config["entropy_reg"]
+        self.thresh = config["thresh"]
+        self.scale = config["scale"]
         self.mode = 0
         model, self.opt = fabric.setup(model, self.opt)
 
@@ -21,7 +22,6 @@ class ConstrainedWRR:
         ### Python crashes regularly with POT so switching to GeomLoss
         ot_loss = geomloss.SamplesLoss(loss="sinkhorn", p=self.p, blur=self.reg)
         return ot_loss(f_source, f_target)
-
 
     def adapt(self, model, fabric, X_source, y_source, X_target, y_target=[]):
 
@@ -38,7 +38,6 @@ class ConstrainedWRR:
             loss = source_loss + self.scale * ot_cost
             fabric.backward(loss)
 
-
     @torch.no_grad()
     def validate(self, model, fabric, X_source, y_source, X_target):
         pred_source = model(X_source)
@@ -46,8 +45,10 @@ class ConstrainedWRR:
         ot_cost = self.calc_ot(pred_source, pred_target)
 
         if ot_cost > self.thresh:
-            self.mode = 0 # minimize OT
+            self.mode = 0  # minimize OT
             print("Constraint threshold exceeded. Minimizing constraint")
         else:
-            self.mode = 1 # minimize scaled WRR
-            print(f"Constraint threshold satisfied. Minimizing WRR with scale {config['wrr_scale']}")
+            self.mode = 1  # minimize scaled WRR
+            print(
+                f"Constraint threshold satisfied. Minimizing WRR with scale {config['wrr_scale']}"
+            )

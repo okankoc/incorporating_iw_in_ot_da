@@ -23,26 +23,30 @@ class ReverseLayerF(Function):
 
 
 class DANN(nn.Module):
-    def __init__(
-            self, config, fabric, model, loss_fun):
+    def __init__(self, config, fabric, model, loss_fun):
         super(DANN, self).__init__()
-        layer_to_apply_disc = config['layer_to_apply_disc']
-        self.discriminator = config['discriminator']
+        layer_to_apply_disc = config["layer_to_apply_disc"]
+        self.discriminator = config["discriminator"]
         self.model = model
         self.name = "DANN"
         model.track_features(layer_to_apply_disc)
         self.opt = torch.optim.Adam(
-            self.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'])
+            self.parameters(),
+            lr=config["learning_rate"],
+            weight_decay=config["weight_decay"],
+        )
         self, self.opt = fabric.setup(self, self.opt)
         self.loss_class = loss_fun
         self.loss_domain = nn.CrossEntropyLoss()
-        self.num_epochs = config['num_epochs']
-        self.num_batches = config['num_batches']
+        self.num_epochs = config["num_epochs"]
+        self.num_batches = config["num_batches"]
         self.idx = 0
 
     def forward_adversarial(self, model, X_data):
         epoch_idx = self.idx // self.num_batches
-        p = (self.idx + epoch_idx * self.num_batches) / (self.num_epochs * self.num_batches)
+        p = (self.idx + epoch_idx * self.num_batches) / (
+            self.num_epochs * self.num_batches
+        )
         alpha = 2.0 / (1.0 + np.exp(-10 * p)) - 1
 
         class_output = model(X_data)
@@ -50,18 +54,21 @@ class DANN(nn.Module):
         domain_output = self.discriminator(reverse_feature)
         return class_output, domain_output
 
-
     def adapt(self, model, fabric, X_source, y_source, X_target, y_target=[]):
         source_batch_size = X_source.shape[0]
         # Feeding in source inputs
-        domain_label = utils.one_hot(torch.zeros(source_batch_size, device=fabric.device, dtype=torch.long), 2)
+        domain_label = utils.one_hot(
+            torch.zeros(source_batch_size, device=fabric.device, dtype=torch.long), 2
+        )
         class_output, domain_output = self.forward_adversarial(model, X_source)
         err_s_label = self.loss_class(class_output, y_source)
         err_s_domain = self.loss_domain(domain_output, domain_label)
 
         # Feeding in target labels
         target_batch_size = X_target.shape[0]
-        domain_label = utils.one_hot(torch.ones(target_batch_size, device=fabric.device, dtype=torch.long), 2)
+        domain_label = utils.one_hot(
+            torch.ones(target_batch_size, device=fabric.device, dtype=torch.long), 2
+        )
         _, domain_output = self.forward_adversarial(model, X_target)
 
         err_t_domain = self.loss_domain(domain_output, domain_label)
@@ -72,7 +79,6 @@ class DANN(nn.Module):
         self.opt.step()
         self.opt.zero_grad()
         self.idx += 1
-
 
     def validate(self, model, fabric, X_train, y_train, X_shift):
         pass
