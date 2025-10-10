@@ -2,8 +2,7 @@ import torch
 
 
 class ERM:
-    def __init__(self, fabric, model, loss_fun, opt):
-        self.mode = mode
+    def __init__(self, model, fabric, loss_fun, opt):
         self.name = "ERM"
         print(f"Initializing {self.name}")
         self.loss_fun = loss_fun

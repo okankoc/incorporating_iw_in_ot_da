@@ -16,10 +16,11 @@ def test(dataloader, model, loss_fun, fabric):
     with torch.no_grad():
         for X, y in dataloader:
             pred = model(X)
+            # We expect loss to reduce to mean here!
             test_loss += loss_fun(pred, one_hot(y, model.num_classes)).item() * y.size(
                 0
             )
-            correct += (pred.argmax(1) == y).sum() * y.size(0)
+            correct += (pred.argmax(1) == y).sum()
             num_points += y.size(0)
     test_loss = fabric.all_reduce(test_loss, reduce_op='sum')
     correct = fabric.all_reduce(correct, reduce_op='sum')

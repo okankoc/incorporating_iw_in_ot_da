@@ -12,9 +12,61 @@ from torchvision.transforms import v2
 import utils
 
 
+def init_scenario(config, fabric):
+    dataloader_options = {
+        "batch_size": config["batch_size"],
+        "shuffle": False,
+        "drop_last": False,
+    }
+    test_dataloader_options = {
+        "batch_size": config["test_batch_size"],
+        "shuffle": False,
+        "drop_last": False,
+    }
+    if config["scenario"] == "MNIST_TO_USPS":
+        scenario = MNIST_to_USPS(
+            dataloader_options,
+            test_dataloader_options,
+            use_sampler=True,
+            class_balanced=config["class_balanced"],
+        )
+    elif config["scenario"] == "USPS_TO_MNIST":
+        scenario = USPS_to_MNIST(
+            dataloader_options, test_dataloader_options, use_sampler=True
+        )
+    elif config["scenario"] == "MNIST_TO_MNIST_M":
+        scenario = MNIST_to_MNIST_M(
+            dataloader_options, test_dataloader_options, preprocess=False
+        )
+    elif config["scenario"] == "SVHN_TO_MNIST":
+        scenario = SVHN_to_MNIST(
+            dataloader_options,
+            test_dataloader_options,
+            class_balanced=config["class_balanced"],
+        )
+    elif config["scenario"] == "CIFAR10C":
+        scenario = CIFAR_CORRUPT(
+            dataloader_options,
+            test_dataloader_options,
+            corruptions=["fog", "frost", "snow"],
+        )
+    elif config["scenario"] == "PORTRAITS":
+        scenario = PORTRAITS(
+            dataloader_options, test_dataloader_options, size=(32, 32), train_ratio=0.8
+        )
+    elif config["scenario"] == "OFFICEHOME":
+        scenario = OFFICEHOME(
+            dataloader_options, test_dataloader_options, size=(224, 224)
+        )
+    else:
+        raise Exception("Unknown scenario")
+    return scenario
+
+
 class USPS_to_MNIST:
     def __init__(self, dataloader_options, test_dataloader_options, use_sampler):
         self.name = "USPS_TO_MNIST"
+        self.num_channels = 1
         self.num_classes = 10
         self.dataloader_options = dataloader_options
         self.source_name = "USPS"
@@ -72,6 +124,7 @@ class MNIST_to_USPS:
         self, dataloader_options, test_dataloader_options, use_sampler, class_balanced
     ):
         self.name = "MNIST_TO_USPS"
+        self.num_channels = 1
         self.num_classes = 10
         self.dataloader_options = dataloader_options
         self.source_name = "MNIST"
@@ -206,6 +259,7 @@ class MNIST_to_MNIST_M:
             self.process_MNIST_M_labels(root="data/MNIST-M", use_train=True)
             self.process_MNIST_M_labels(root="data/MNIST-M", use_train=False)
         self.num_classes = 10
+        self.num_channels = 3
         self.input_size = 3072
         self.dataloader_options = dataloader_options
         self.source_name = "MNIST"
@@ -277,6 +331,7 @@ class SVHN_to_MNIST:
         self.source_name = "SVHN"
         self.target_name = "MNIST"
         self.input_size = 3072
+        self.num_channels = 3
         self.num_classes = 10
         self.transforms_source = v2.Compose(
             [v2.ToImage(), v2.ToDtype(torch.float32, scale=True)]
@@ -384,6 +439,7 @@ class CIFAR_CORRUPT:
         self.source_name = "CIFAR10"
         self.target_name = "CIFAR10C"
         self.input_size = 3072
+        self.num_channels = 3
         self.num_classes = 10
         self.transforms_source = v2.Compose(
             [v2.ToImage(), v2.ToDtype(torch.float32, scale=True)]
@@ -463,6 +519,7 @@ class OFFICEHOME:
         grayscale=False,
     ):
         self.name = "OFFICEHOME"
+        self.num_channels = 3
         self.num_classes = 65
         self.dataloader_options = dataloader_options
         self.input_size = size[0] * size[1]
@@ -508,6 +565,7 @@ class OFFICEHOME:
 class PORTRAITS:
     def __init__(self, dataloader_options, size=(32, 32), train_ratio=0.8):
         self.name = "PORTRAITS"
+        self.num_channels = 1
         self.num_classes = 2
         self.dataloader_options = dataloader_options
         self.input_size = size[0] * size[1]

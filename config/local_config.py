@@ -8,13 +8,13 @@ def setup_local_config():
         # Experiment details
         "device": "auto",  # 'cpu' or 'auto' to find gpu automatically
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        "model": "ConvNet",
-        "resnet_size": 50,  # 18 or 50
+        "model": "ResNet",
+        "resnet_size": 18,  # 18 or 50
         "pretrain": True,
-        "num_pretrain_epochs": 5,  # if pretrain is True
+        "num_pretrain_epochs": 1,  # if pretrain is True
         "loss": MarginLoss(),  # MarginLoss(), EuclideanLoss(), CELoss()
-        "optimizer": "adam",  # alternatives: adam, sgd
-        "learning_rate": 1e-3,  # use 1e-4 for ResNets or a learning scheduler
+        "optimizer": "sgd",  # alternatives: adam, sgd
+        "learning_rate": 1e-4,  # use 1e-4 for ResNets or a learning scheduler
         "momentum": 0.9,  # for SGD
         "weight_decay": 0.0,
         # Data loader options
@@ -22,21 +22,15 @@ def setup_local_config():
         # Distribution shift scenario (MNIST_TO_USPS, CIFAR10C, ...)
         "scenario": "MNIST_TO_USPS",
         "class_balanced": False,
-        "num_epochs": 5,
-        "num_runs": 5,
+        "num_epochs": 2,
+        "num_runs": 1,
         "algs": [
-            "wrr",
             "weighted_wrr",
-            "cons_wrr",
-            "lje",
-            "erm",
-            "cc",
-            "dann",
-            "reverse-kl",
+            "wrr",
         ],  # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
         # Debugging algorithms
 
-        "debug": False,
+        "debug": True,
         "print_every_n": 50,
         "report_source_train_risk": False,
         "report_target_train_risk": False,
@@ -45,7 +39,7 @@ def setup_local_config():
         # Test set dataloader options
         "test_batch_size": 512,
         "checkpoint": False,
-        "validate": False,
+        "validate": True,
     }
 
     debug_config = {
@@ -91,7 +85,7 @@ def setup_alg_config(config):
     cons_wrr_config = {"norm": 2, "entropy_reg": 1e-3, "scale": 1.0, "thresh": 0.01}
 
     dann_config = {
-        "layer_to_apply_disc": "flatten",  #'flatten' for Conv or -2 for MLP
+        "layer_to_apply_disc": -2,  #'flatten' for Conv or -2 for MLP, ignored for ResNets (always input to fc layer is taken)!
         "discriminator": ConvDomainClassifier(),  # ConvDomainClassifier() or MLP([100, 10, 2], nn.ReLU())
         "learning_rate": 1e-3,  # for the internal optimizer
         "weight_decay": 0.0,
@@ -117,8 +111,8 @@ def setup_alg_config(config):
     }
 
     reverse_kl_config = {
-        "alpha_reverse": 0.1,
-        "alpha_forward": 0.1,
+        "alpha_reverse": 0.0,
+        "alpha_forward": 0.0,
         "augment_softmax": 0.0,
     }
 

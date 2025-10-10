@@ -1,12 +1,7 @@
 """Script for testing unsupervised domain adaptation algorithms in several different distribution shift scenarios."""
-
-import copy
-import types
+import os
 import numpy as np
 import torch
-import torchvision.models
-import geomloss
-from torch import nn
 import matplotlib
 import matplotlib.pyplot as plt
 from lightning import Fabric
@@ -14,19 +9,11 @@ from lightning import Fabric
 # Code from this repo
 import utils
 import shifts
-from loss import MarginLoss, EuclideanLoss, CELoss
-from adapt.wrr import WRR
-from adapt.weighted_wrr import WeightedWRR
-from adapt.constrained_wrr import ConstrainedWRR
-from adapt.oracle import OracleLJE, OracleCC
-from adapt.erm import ERM
-from adapt.dann import DANN
-from adapt.fdal import FDAL
-from adapt.reverse_kl import ReverseKL
-from adapt.debug import debug_model
-from models.conv import ConvNet, ConvNet2, LeNet, SmallCNN, ConvDomainClassifier
-from models.mlp import MultiLayerPerceptron as MLP
-from setup_config import setup_config
+import adapt
+from debug import debug_method
+from config.local_config import setup_local_config
+from config.cluster_config import setup_cluster_config
+from load_model import load_model, init_model, pretrain_model, init_lazy_modules, init_lazy_discriminator
 
 
 def reset_all(seed):
@@ -42,53 +29,56 @@ def reset_all(seed):
     torch.backends.cudnn.benchmark = False
 
 
-def init_algorithm(config, name, model, loss_fun, opt, fabric):
+def init_algorithm(config, name, model, loss_fun, opt, scenario, fabric):
     # Prepare adaptation methods
     if name == "wrr":
-        alg = WRR(config["wrr"], fabric, model, loss_fun, opt)
+        alg = adapt.wrr.WRR(config["wrr"], fabric, model, loss_fun, opt)
     if name == "weighted_wrr":
-        alg = WeightedWRR(config["weighted_wrr"], fabric, model, loss_fun, opt)
+        alg = adapt.weighted_wrr.WeightedWRR(config["weighted_wrr"], fabric, model, loss_fun, opt)
     if name == "cons_wrr":
-        alg = ConstrainedWRR(config["cons_wrr"], fabric, model, loss_fun, opt)
+        alg = adapt.constrained_wrr.ConstrainedWRR(config["cons_wrr"], fabric, model, loss_fun, opt)
     if name == "lje":
-        alg = OracleLJE(model, fabric, loss_fun, opt)
+        alg = adapt.oracle.OracleLJE(fabric, model, loss_fun, opt)
     if name == "cc":
-        alg = OracleCC(config["cc"], fabric, model, loss_fun, opt)
+        alg = adapt.oracle.OracleCC(config["cc"], fabric, model, loss_fun, opt)
     if name == "erm":
-        alg = ERM(model, fabric, loss_fun, opt)
+        alg = adapt.erm.ERM(model, fabric, loss_fun, opt)
     if name == "dann":
-        alg = DANN(config["dann"], fabric, model, loss_fun)
+        alg = adapt.dann.DANN(config["dann"], fabric, model, loss_fun, scenario)
     if name == "fdal":
-        alg = FDAL(config["fdal"], fabric, model, loss_fun)
+        alg = adapt.fdal.FDAL(config["fdal"], fabric, model, loss_fun, scenario)
     if name == "reverse-kl":
-        alg = ReverseKL(config["reverse_kl"], fabric, model, loss_fun, opt)
-    return alg
+        alg = adapt.reverse_kl.ReverseKL(config["reverse_kl"], fabric, model, loss_fun, opt)
+        model = alg.model # model is probabilistic representation network in reverse-kl case
+    return alg, model
 
 
 def run_uda(config, fabric):
-    # Run adaptation
-    loss_fun = config["loss"]
-    scenario = init_scenario(config, fabric)
-    model = init_model(config, scenario)
-    init_lazy_modules(model, scenario)
-    scenario = setup_fabric_dataloaders(fabric, scenario)
-    pretrain_model(model, config, fabric, scenario, loss_fun)
-
     methods = config["algs"]
     num_methods = len(methods)
     num_epochs = config["num_epochs"]
     num_runs = config["num_runs"]
     results = torch.zeros(
-        num_methods, num_runs, num_epochs, 4
-    )  # saving loss_source, acc_source, loss_target, acc_target
+        num_methods, num_runs, num_epochs+1, 4)
+
+    # Run adaptation
+    loss_fun = config["loss"]
+    scenario = shifts.init_scenario(config, fabric)
+    model = init_model(config, scenario)
+    init_lazy_modules(model, scenario)
+    scenario = setup_fabric_dataloaders(fabric, scenario)
+    opt = init_opt(config, model)
+    results = pretrain_model(model, config, fabric, scenario, loss_fun, opt, results)
+
+    # saving loss_source, acc_source, loss_target, acc_target
     for i in range(num_methods):
         for j in range(num_runs):
             reset_all(seed=j)
             model = load_model(config, fabric, scenario, loss_fun)
             opt = init_opt(config, model)
-            alg = init_algorithm(config, methods[i], model, loss_fun, opt, fabric)
+            alg, model = init_algorithm(config, methods[i], model, loss_fun, opt, scenario, fabric)
             print("===============================")
-            print(f"Algorithm {alg.name}")
+            print(f"Algorithm {alg.name}, run number: {j}")
             for epoch in range(num_epochs):
                 batch_idx = 0
                 print(f"Epoch {epoch+1}")
@@ -116,7 +106,7 @@ def run_uda(config, fabric):
 
                 print("===============================")
                 print(f"Algorithm {alg.name}")
-                results[i, j, epoch, :] = utils.report_metrics(
+                results[i, j, epoch+1, :] = utils.report_metrics(
                     scenario,
                     model,
                     loss_fun,
@@ -125,88 +115,6 @@ def run_uda(config, fabric):
                     fabric,
                 )
     return results
-
-
-def debug_method(config, method, model, loss_fun, scenario, fabric, idx_des):
-    num_batches = (
-        len(scenario.source_test_dataloader.dataset) / config["test_batch_size"]
-    )
-    idx_des = idx_des % num_batches
-    idx = 0
-    for (X_train, y_train), (X_shift, y_shift) in zip(
-        scenario.source_test_dataloader, scenario.target_test_dataloader
-    ):
-        if idx == idx_des:
-            print("============================================")
-            print(f"Debugging/validating on {idx}'th test batch")
-            y_train = utils.one_hot(y_train, scenario.num_classes)
-            y_shift = utils.one_hot(y_shift, scenario.num_classes)
-            debug_model(
-                config["debug_options"],
-                model,
-                loss_fun,
-                fabric,
-                X_train,
-                y_train,
-                X_shift,
-                y_shift,
-            )
-            if config["validate"] is True:
-                method.validate(config, model, fabric, X_train, y_train, X_shift)
-            break
-            print("============================================")
-        idx += 1
-
-
-def init_scenario(config, fabric):
-    dataloader_options = {
-        "batch_size": config["batch_size"],
-        "shuffle": False,
-        "drop_last": True,
-    }
-    test_dataloader_options = {
-        "batch_size": config["test_batch_size"],
-        "shuffle": False,
-        "drop_last": True,
-    }
-    if config["scenario"] == "MNIST_TO_USPS":
-        scenario = shifts.MNIST_to_USPS(
-            dataloader_options,
-            test_dataloader_options,
-            use_sampler=True,
-            class_balanced=config["class_balanced"],
-        )
-    elif config["scenario"] == "USPS_TO_MNIST":
-        scenario = shifts.USPS_to_MNIST(
-            dataloader_options, test_dataloader_options, use_sampler=True
-        )
-    elif config["scenario"] == "MNIST_TO_MNIST_M":
-        scenario = shifts.MNIST_to_MNIST_M(
-            dataloader_options, test_dataloader_options, preprocess=False
-        )
-    elif config["scenario"] == "SVHN_TO_MNIST":
-        scenario = shifts.SVHN_to_MNIST(
-            dataloader_options,
-            test_dataloader_options,
-            class_balanced=config["class_balanced"],
-        )
-    elif config["scenario"] == "CIFAR10C":
-        scenario = shifts.CIFAR_CORRUPT(
-            dataloader_options,
-            test_dataloader_options,
-            corruptions=["fog", "frost", "snow"],
-        )
-    elif config["scenario"] == "PORTRAITS":
-        scenario = shifts.PORTRAITS(
-            dataloader_options, test_dataloader_options, size=(32, 32), train_ratio=0.8
-        )
-    elif config["scenario"] == "OFFICEHOME":
-        scenario = shifts.OFFICEHOME(
-            dataloader_options, test_dataloader_options, size=(224, 224)
-        )
-    else:
-        raise Exception("Unknown scenario")
-    return scenario
 
 
 # For now we assume that all algorithms share the optimizer, but we can change that later
@@ -229,12 +137,6 @@ def init_opt(config, model):
     return opt
 
 
-def init_lazy_modules(model, scenario):
-    for X_source in scenario.source_dataloader:
-        model(X_source[0])
-        break
-
-
 def setup_fabric_dataloaders(fabric, scenario):
     scenario.source_dataloader = fabric.setup_dataloaders(scenario.source_dataloader)
     scenario.target_dataloader = fabric.setup_dataloaders(scenario.target_dataloader)
@@ -247,145 +149,61 @@ def setup_fabric_dataloaders(fabric, scenario):
     return scenario
 
 
-def pretrain_model(model, config, fabric, scenario, loss_fun):
-    folder_path = "save_files/" + scenario.name + "/"
-    save_path = folder_path + model.name + ".pth"
-    try:
-        # Load parameters from a file
-        model.load_state_dict(torch.load(save_path, weights_only=True))
-        print(f"Saved model found! Loading parameters from file: {save_path}")
-        model = fabric.setup(model)
-    except:
-        print(f"Saved model NOT found!")
-        if config["pretrain"] is True:
-            opt = init_opt(config, model)
-            model, opt = fabric.setup(model, opt)
-            print(f"Pretraining {config['num_pretrain_epochs']} epochs...")
-            if config["pretrain_on_both"] is True:
-                print(
-                    "========= DEBUG MODE ON: USING TARGET LABELS TO PRETRAIN LJE ORACLE MODEL ======="
-                )
-                model = utils.train_model_on_source_and_target(
-                    config, model, loss_fun, scenario, opt, fabric
-                )
-            else:
-                model = utils.train_model_on_source(
-                    config, model, loss_fun, scenario, opt, fabric
-                )
-
-    # Report initial performance
-    utils.report_metrics(
-        scenario,
-        model,
-        loss_fun,
-        config["report_source_train_risk"],
-        config["report_target_train_risk"],
-        fabric,
-    )
-
-
-def init_model(config, scenario):
-    if config["model"] == "MLP":
-        model = MLP(
-            layer_sizes=[scenario.input_size, 200, 100, scenario.num_classes],
-            f_nonlinear=nn.ReLU(),
-        )
-    elif config["model"] == "ConvNet":
-        model = ConvNet(num_classes=scenario.num_classes)
-    elif config["model"] == "ConvNet2":
-        model = ConvNet2(num_classes=scenario.num_classes)
-    elif config["model"] == "LeNet":
-        model = LeNet(num_classes=scenario.num_classes)
-    elif config["model"] == "SmallCNN":
-        model = SmallCNN(num_classes=scenario.num_classes)
-    elif config["model"] == "ResNet":
-        model = init_resnet(config["resnet_size"], scenario.num_classes)
-    print(f"Initialized model {model.name}")
-    return model
-
-
-def load_model(config, fabric, scenario, loss_fun):
-    model = init_model(config, scenario)
-    folder_path = "save_files/" + scenario.name + "/"
-    save_path = folder_path + model.name + ".pth"
-    try:
-        # Load parameters from a file
-        model.load_state_dict(torch.load(save_path, weights_only=True))
-        print(f"Saved model found! Loading parameters from file: {save_path}")
-    except:
-        print(f"Saved model NOT found!")
-
-    model.train()
-    if config["adapt_only_last_layer"] == True:
-        num_layers = len(list(model.parameters()))
-        for i, p in enumerate(model.parameters()):
-            if i < num_layers - 1:
-                p.requires_grad = False
-    return model
-
-
-def init_resnet(size, num_classes):
-    if size == 18:
-        model = torchvision.models.resnet18(weights="IMAGENET1K_V1")
-        model.name = "RESNET18"
-    elif size == 50:
-        model = torchvision.models.resnet50(weights="IMAGENET1K_V1")
-        model.name = "RESNET50"
-    else:
-        raise Exception("Resnet size not allowed!")
-    model.num_classes = num_classes
-    model.fc = nn.Linear(model.fc.in_features, num_classes)
-
-    @torch.no_grad()
-    def save_params(model):
-        model.state = copy.deepcopy(model.state_dict())
-
-    @torch.no_grad()
-    def restore_params(model):
-        model.load_state_dict(model.state)
-        return dict(model.named_parameters())
-
-    model.save_params = types.MethodType(save_params, model)
-    model.restore_params = types.MethodType(restore_params, model)
-    return model
-
-
-def plot_results(results, config):
+def save_results(results, config):
     os.makedirs("results", exist_ok=True)
+    model_name = config["model"]
+    scenario_name = config["scenario"]
     methods = config["algs"]
     num_methods, num_runs, num_epochs, _ = results.shape
     metrics = ["loss_source", "acc_source", "loss_target", "acc_target"]
 
+    data = {'config': config}
     for m, metric in enumerate(metrics):
-        save_name = "results/" + scenario.name + "_" + model.name + "_" + metric
+        data[metric] = {}
+        save_name = "results/" + scenario_name + "_" + model_name + "_" + metric
         fig, ax = plt.subplots()
         for i, method in enumerate(methods):
+            data[metric][method] = results[i, :, :, m]
             stds, means = torch.std_mean(results[i, :, :, m], dim=0)
             ax.errorbar(x=np.arange(num_epochs), y=means, yerr=stds, label=method)
         ax.legend(loc="upper right")
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         plt.savefig(save_name + ".pdf", format="pdf")
+    torch.save(data, "results/" + scenario_name + "_" + model_name + ".pth")
 
 
-def run_all_experiments(config, fabric):
+def run_on_cluster():
+    config = setup_cluster_config()
+    fabric = Fabric(accelerator=config["device"], devices="auto", strategy="auto")
+    fabric.launch()
+
+    if fabric.global_rank != 0:
+        import builtins
+
+        builtins.print = lambda *args, **kwargs: None
+
+    print(f"Fabric device: {fabric.device}")
+    reset_all(seed=0)
+
     # Run all experiments
-    models = ["MLP", "ConvNet"]
+    models = ["MLP", "ConvNet", "ResNet"]
+    dann_layers = [-2, "flatten", -1] # ignored for ResNet
     scenarios = ["MNIST_TO_USPS", "USPS_TO_MNIST", "MNIST_TO_MNIST_M", "SVHN_TO_MNIST"]
-    for model in models:
+    for i, model in enumerate(models):
+        if model == "ResNet":
+            config["optimizer"] = "sgd"
+            config["learning_rate"] = 1e-4
         for scenario in scenarios:
             config["model"] = model
             config["scenario"] = scenario
+            config["dann"]["layer_to_apply_disc"] = dann_layers[i]
             res = run_uda(config, fabric)
-            plot_results(res, config["algs"])
+            save_results(res, config)
 
 
-if __name__ == "__main__":
-    torch.set_default_dtype(torch.float32)
-    # torch.set_printoptions(precision=3, sci_mode=False)
-    # torch.autograd.set_detect_anomaly(True)
-
-    config = setup_config()
+def run_on_local():
+    config = setup_local_config()
     fabric = Fabric(accelerator=config["device"], devices="auto", strategy="auto")
     fabric.launch()
 
@@ -398,5 +216,14 @@ if __name__ == "__main__":
     reset_all(seed=0)
 
     res = run_uda(config, fabric)
-    plot_results(res, config["algs"])
-    # run_all_experiments(config, fabric)
+    save_results(res, config)
+
+
+
+if __name__ == "__main__":
+    torch.set_default_dtype(torch.float32)
+    # torch.set_printoptions(precision=3, sci_mode=False)
+    # torch.autograd.set_detect_anomaly(True)
+
+    # run_on_local()
+    run_on_cluster()

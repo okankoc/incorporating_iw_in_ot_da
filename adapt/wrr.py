@@ -62,5 +62,5 @@ class WRR:
                 f"WRR: {loss.item()}, ot_cost: {ot_cost.item()}, source_loss: {source_loss.item()}"
             )
 
-    def validate(self, config, model, fabric, X_source, y_source, X_target):
+    def validate(self, model, fabric, X_source, y_source, X_target):
         pass

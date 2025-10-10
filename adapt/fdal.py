@@ -4,20 +4,22 @@ import copy
 import torch.nn.utils.spectral_norm as sn
 
 from fDAL import fDALLearner
+from load_model import init_lazy_discriminator
 
 
 class FDAL:
-    def __init__(self, config, fabric, model, loss_fun):
+    def __init__(self, config, fabric, model, loss_fun, scenario):
         self.name = "FDAL"
         print(f"Initializing {self.name}")
         juncture = config["juncture"]
         backbone = model.net[:juncture]
         taskhead = model.net[juncture:]
-        self.clip_grad_val = config["clip_grad_val"]
         if config["auxhead"] == "none":
             aux_head = None
         else:
             aux_head = config["auxhead"]
+            init_lazy_discriminator(aux_head, backbone, scenario, use_features=False)
+        self.clip_grad_val = config["clip_grad_val"]
         self.learner = fDALLearner(
             backbone,
             taskhead,

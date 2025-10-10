@@ -3,12 +3,12 @@ from models.conv import ConvDomainClassifier
 from models.mlp import MultiLayerPerceptron as MLP
 
 
-def setup_local_config():
+def setup_cluster_config():
     config = {
         # Experiment details
         "device": "auto",  # 'cpu' or 'auto' to find gpu automatically
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        "model": "ConvNet",
+        "model": "ResNet",
         "resnet_size": 50,  # 18 or 50
         "pretrain": True,
         "num_pretrain_epochs": 5,  # if pretrain is True
@@ -28,14 +28,14 @@ def setup_local_config():
             "wrr",
             "weighted_wrr",
             "cons_wrr",
-            "lje",
-            "erm",
-            "cc",
             "dann",
             "reverse-kl",
+            "erm",
+            "lje",
+            "cc",
         ],  # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
-        # Debugging algorithms
 
+        # Debugging algorithms
         "debug": False,
         "print_every_n": 50,
         "report_source_train_risk": False,
@@ -119,7 +119,7 @@ def setup_alg_config(config):
     reverse_kl_config = {
         "alpha_reverse": 0.1,
         "alpha_forward": 0.1,
-        "augment_softmax": 0.0,
+        "augment_softmax": 0.001,
     }
 
     config["wrr"] = wrr_config

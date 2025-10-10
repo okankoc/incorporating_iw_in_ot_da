@@ -7,6 +7,7 @@ import numpy as np
 import utils
 from models.conv import ConvDomainClassifier
 from models.mlp import MultiLayerPerceptron as MLP
+from load_model import init_lazy_discriminator
 
 
 # TODO: Replace with WarmGRL code from fdal repo
@@ -23,13 +24,14 @@ class ReverseLayerF(Function):
 
 
 class DANN(nn.Module):
-    def __init__(self, config, fabric, model, loss_fun):
+    def __init__(self, config, fabric, model, loss_fun, scenario):
         super(DANN, self).__init__()
-        layer_to_apply_disc = config["layer_to_apply_disc"]
-        self.discriminator = config["discriminator"]
+        discr = config["discriminator"]
+        model.track_features(config["layer_to_apply_disc"])
+        init_lazy_discriminator(discr, model, scenario, use_features=True)
+        self.discriminator = discr
         self.model = model
         self.name = "DANN"
-        model.track_features(layer_to_apply_disc)
         self.opt = torch.optim.Adam(
             self.parameters(),
             lr=config["learning_rate"],

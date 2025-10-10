@@ -5,6 +5,37 @@ import numpy as np
 import utils
 
 
+def debug_method(config, method, model, loss_fun, scenario, fabric, idx_des):
+    num_batches = (
+        len(scenario.source_test_dataloader.dataset) / config["test_batch_size"]
+    )
+    idx_des = idx_des % num_batches
+    idx = 0
+    for (X_train, y_train), (X_shift, y_shift) in zip(
+        scenario.source_test_dataloader, scenario.target_test_dataloader
+    ):
+        if idx == idx_des:
+            print("============================================")
+            print(f"Debugging/validating on {idx}'th test batch")
+            y_train = utils.one_hot(y_train, scenario.num_classes)
+            y_shift = utils.one_hot(y_shift, scenario.num_classes)
+            debug_model(
+                config["debug_options"],
+                model,
+                loss_fun,
+                fabric,
+                X_train,
+                y_train,
+                X_shift,
+                y_shift,
+            )
+            if config["validate"] is True:
+                method.validate(model, fabric, X_train, y_train, X_shift)
+            break
+            print("============================================")
+        idx += 1
+
+
 # Debugging by printing Wasserstein-based bounds for all methods!
 def debug_model(
     config, model, loss_fun, fabric, X_source, y_source, X_target, y_target
@@ -190,10 +221,10 @@ def calc_weighted_wrr(model, fabric, loss_fun, f_source, f_target, y_source, reg
     num_source = y_source.shape[0]
     w_source = torch.ones(num_source, device=fabric.device) / num_source
     reg_m = (1.0, 100.0)
-    ot_mat = ot.sinkhorn_unbalanced(
-        w_source, w_target, cost_mat, reg, reg_m, method="sinkhorn_stabilized"
-    )
-    # ot_mat = ot.unbalanced.mm_unbalanced(w_source, w_target, cost_mat, reg_m, div='kl', numItermax=1000)
+    # ot_mat = ot.sinkhorn_unbalanced(
+    #     w_source, w_target, cost_mat, reg, reg_m, method="sinkhorn_stabilized"
+    # )
+    ot_mat = ot.unbalanced.mm_unbalanced(w_source, w_target, cost_mat, reg_m, div='kl', numItermax=1000)
 
     loss = torch.sum(ot_mat * cost_mat)
     w_source = torch.sum(ot_mat, dim=1)

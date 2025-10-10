@@ -10,7 +10,7 @@ class OracleLJE:
         self.opt = opt
         model, self.opt = fabric.setup(model, self.opt)
 
-    def adapt(self, config, model, fabric, X_source, y_source, X_target, y_target=[]):
+    def adapt(self, model, fabric, X_source, y_source, X_target, y_target=[]):
         pred_source = model(X_source)
         loss = self.loss_fun(pred_source, y_source)
         if len(y_target) > 0:
@@ -21,7 +21,7 @@ class OracleLJE:
         self.opt.step()
         self.opt.zero_grad()
 
-    def validate(self, config, model, fabric, X_source, y_source, X_target):
+    def validate(self, model, fabric, X_source, y_source, X_target):
         pass
 
 

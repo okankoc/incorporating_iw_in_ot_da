@@ -9,8 +9,9 @@ class ReverseKL:
     def __init__(self, config, fabric, model, loss_fun, opt):
         super(ReverseKL, self).__init__()
         self.loss_fun = copy.deepcopy(loss_fun)
-        self.model = ProbModel(model)
-        self.model, self.opt = fabric.setup(self.model, opt)
+        model = ProbModel(model)
+        self.model, self.opt = fabric.setup(model, opt)
+        self.model.mark_forward_method('forward_distr')
         self.name = "Reverse-KL"
         self.alpha_reverse = config[
             "alpha_reverse"
@@ -50,8 +51,8 @@ class ReverseKL:
         return kl_reg
 
     def adapt(self, model, fabric, X_source, y_source, X_target, y_target=[]):
-        mean_s, std_s, sample_s, out_s, distr_s = self.model.forward_distr(X_source)
-        mean_t, std_t, sample_t, out_t, distr_t = self.model.forward_distr(X_target)
+        mean_s, std_s, sample_s, out_s, distr_s = model.forward_distr(X_source)
+        mean_t, std_t, sample_t, out_t, distr_t = model.forward_distr(X_target)
 
         out_s = torch.softmax(out_s, 1)
         if self.augment_softmax != 0.0:
@@ -75,9 +76,9 @@ class ReverseKL:
         self.opt.step()
         self.opt.zero_grad()
 
-    def validate(self, model, fabric, X_source, y_source, X_target):
-        mean_s, std_s, sample_s, out_s, distr_s = self.model.forward_distr(X_source)
-        mean_t, std_t, sample_t, out_t, distr_t = self.model.forward_distr(X_target)
+    def validate(self, model, fabric, X_source, y_source, X_target, y_target=[]):
+        mean_s, std_s, sample_s, out_s, distr_s = model.forward_distr(X_source)
+        mean_t, std_t, sample_t, out_t, distr_t = model.forward_distr(X_target)
         source_loss = self.loss_fun(out_s, y_source)
         kl_reg = self.compute_kl(
             mean_s,
@@ -91,4 +92,3 @@ class ReverseKL:
             fabric.device,
         )
         print(f"Source_loss: {source_loss}, kl_reg: {kl_reg}")
-        pass

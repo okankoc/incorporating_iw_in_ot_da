@@ -6,7 +6,7 @@ import geomloss
 class ConstrainedWRR:
     def __init__(self, config, fabric, model, loss_fun, opt):
         self.loss_fun = copy.deepcopy(loss_fun)
-        self.name = "WRR"
+        self.name = "ConsWRR"
         self.opt = opt
         self.p = config["norm"]
         self.reg = config["entropy_reg"]
@@ -50,5 +50,4 @@ class ConstrainedWRR:
         else:
             self.mode = 1  # minimize scaled WRR
             print(
-                f"Constraint threshold satisfied. Minimizing WRR with scale {config['wrr_scale']}"
-            )
+                "Constraint threshold satisfied. Minimizing WRR.")
