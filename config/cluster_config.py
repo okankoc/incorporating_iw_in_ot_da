@@ -1,18 +1,13 @@
-from loss import MarginLoss, EuclideanLoss, CELoss
-from models.conv import ConvDomainClassifier
-from models.mlp import MultiLayerPerceptron as MLP
-
-
 def setup_cluster_config():
     config = {
         # Experiment details
         "device": "auto",  # 'cpu' or 'auto' to find gpu automatically
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
         "model": "ResNet",
-        "resnet_size": 50,  # 18 or 50
+        "resnet_size": 18,  # 18 or 50
         "pretrain": True,
         "num_pretrain_epochs": 5,  # if pretrain is True
-        "loss": MarginLoss(),  # MarginLoss(), EuclideanLoss(), CELoss()
+        "loss": "margin",  # margin, euclidean or cross-entropy
         "optimizer": "adam",  # alternatives: adam, sgd
         "learning_rate": 1e-3,  # use 1e-4 for ResNets or a learning scheduler
         "momentum": 0.9,  # for SGD
@@ -21,6 +16,7 @@ def setup_cluster_config():
         "batch_size": 64,
         # Distribution shift scenario (MNIST_TO_USPS, CIFAR10C, ...)
         "scenario": "MNIST_TO_USPS",
+        "cifar-10-corruptions": ["fog", "frost", "snow"],
         "class_balanced": False,
         "num_epochs": 5,
         "num_runs": 5,
@@ -28,11 +24,11 @@ def setup_cluster_config():
             "wrr",
             "weighted_wrr",
             "cons_wrr",
+            "lje",
+            "erm",
+            "cc",
             "dann",
             "reverse-kl",
-            "erm",
-            "lje",
-            "cc",
         ],  # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
 
         # Debugging algorithms
@@ -92,7 +88,7 @@ def setup_alg_config(config):
 
     dann_config = {
         "layer_to_apply_disc": "flatten",  #'flatten' for Conv or -2 for MLP
-        "discriminator": ConvDomainClassifier(),  # ConvDomainClassifier() or MLP([100, 10, 2], nn.ReLU())
+        "discriminator": "conv", # conv or mlp
         "learning_rate": 1e-3,  # for the internal optimizer
         "weight_decay": 0.0,
         "num_epochs": 2,
@@ -101,7 +97,7 @@ def setup_alg_config(config):
 
     fdal_config = {
         "juncture": -1,  # For now we keep backbone/taskhead juncture at the last layer only
-        "auxhead": ConvDomainClassifier(),  # This seems to be necessary to prevent blowing up!
+        "auxhead": "conv",  # conv or none
         "grl": {"max_iters": 3000, "hi": 0.6, "auto_step": True},
         "divergence": "pearson",
         "learning_rate": 1e-3,  # for the internal optimizer

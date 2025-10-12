@@ -4,6 +4,7 @@ import copy
 import torch.nn.utils.spectral_norm as sn
 
 from fDAL import fDALLearner
+from models.conv import ConvDomainClassifier
 from load_model import init_lazy_discriminator
 
 
@@ -16,9 +17,11 @@ class FDAL:
         taskhead = model.net[juncture:]
         if config["auxhead"] == "none":
             aux_head = None
+        elif config["auxhead"] == 'conv':
+            aux_head = ConvDomainClassifier()
+            aux_head = init_lazy_discriminator(aux_head, backbone, scenario, use_features=False)
         else:
-            aux_head = config["auxhead"]
-            init_lazy_discriminator(aux_head, backbone, scenario, use_features=False)
+            raise Exception('Unknown auxiliary head / domain classifier!')
         self.clip_grad_val = config["clip_grad_val"]
         self.learner = fDALLearner(
             backbone,

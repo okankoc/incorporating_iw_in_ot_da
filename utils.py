@@ -2,7 +2,23 @@ import os
 import time
 import torch
 import numpy as np
-import glog as log
+from torch.utils.data import Dataset
+
+
+class GenericDataset(Dataset):
+    def __init__(self, X_train, y_train, transform=None):
+        self.data = X_train
+        self.targets = y_train
+        self.transform = transform
+
+    def __getitem__(self, index):
+        data, targets = self.data[index], self.targets[index]
+        if self.transform is not None:
+            data = self.transform(data)
+        return data, targets
+
+    def __len__(self):
+        return self.data.shape[0]
 
 
 def one_hot(x, k):
@@ -71,7 +87,7 @@ def train_model_on_source(config, model, loss_fun, scenario, opt, fabric):
     )
     # Report accuracy/loss on whole training dataset
     test(scenario.source_dataloader, model, loss_fun, fabric)
-    log.info(f"Saving parameters to file: {save_path}")
+    print(f"Saving parameters to file: {save_path}")
     os.makedirs(folder_path, exist_ok=True)
     torch.save(model.state_dict(), save_path)
     return model
@@ -98,7 +114,7 @@ def train_model_on_source_and_target(config, model, loss_fun, scenario, opt, fab
     )
     # Report accuracy/loss on whole training dataset
     test(scenario.source_dataloader, model, loss_fun, fabric)
-    log.info(f"Saving parameters to file: {save_path}")
+    print(f"Saving parameters to file: {save_path}")
     os.makedirs(folder_path, exist_ok=True)
     torch.save(model.state_dict(), save_path)
     return model

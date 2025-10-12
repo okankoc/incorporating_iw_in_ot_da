@@ -9,7 +9,7 @@ from models.conv import ConvNet, ConvNet2, LeNet, SmallCNN
 from models.mlp import MultiLayerPerceptron as MLP
 
 
-def load_model(config, fabric, scenario, loss_fun):
+def load_model(config, fabric, scenario):
     model = init_model(config, scenario)
     folder_path = "save_files/" + scenario.name + "/"
     save_path = folder_path + model.name + ".pth"
@@ -19,7 +19,6 @@ def load_model(config, fabric, scenario, loss_fun):
         print(f"Saved model found! Loading parameters from file: {save_path}")
     except:
         print(f"Saved model NOT found!")
-    init_lazy_modules(model, scenario)
     model.train()
     if config["adapt_only_last_layer"] == True:
         num_layers = len(list(model.parameters()))
@@ -45,6 +44,7 @@ def init_model(config, scenario):
         model = SmallCNN(num_classes=scenario.num_classes)
     elif config["model"] == "ResNet":
         model = init_resnet(config["resnet_size"], scenario.num_channels, scenario.num_classes)
+    init_lazy_modules(model, scenario)
     print(f"Initialized model {model.name}")
     return model
 
@@ -96,6 +96,7 @@ def init_lazy_modules(model, scenario):
     for X_source, y_source in scenario.source_dataloader:
         model(X_source.to('cpu'))
         break
+    return model
 
 
 def init_lazy_discriminator(discr, model, scenario, use_features):
@@ -108,6 +109,7 @@ def init_lazy_discriminator(discr, model, scenario, use_features):
         else:
             discr(model(X_source.to('cpu')))
         break
+    return discr
 
 
 def pretrain_model(model, config, fabric, scenario, loss_fun, opt, res):

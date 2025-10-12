@@ -44,11 +44,11 @@ def init_scenario(config, fabric):
             test_dataloader_options,
             class_balanced=config["class_balanced"],
         )
-    elif config["scenario"] == "CIFAR10C":
+    elif config["scenario"] == "CIFAR-10-C":
         scenario = CIFAR_CORRUPT(
             dataloader_options,
             test_dataloader_options,
-            corruptions=["fog", "frost", "snow"],
+            corruptions=config["cifar-10-corruptions"],
         )
     elif config["scenario"] == "PORTRAITS":
         scenario = PORTRAITS(
@@ -68,7 +68,6 @@ class USPS_to_MNIST:
         self.name = "USPS_TO_MNIST"
         self.num_channels = 1
         self.num_classes = 10
-        self.dataloader_options = dataloader_options
         self.source_name = "USPS"
         self.target_name = "MNIST"
         self.transforms_target = v2.Compose(
@@ -126,7 +125,6 @@ class MNIST_to_USPS:
         self.name = "MNIST_TO_USPS"
         self.num_channels = 1
         self.num_classes = 10
-        self.dataloader_options = dataloader_options
         self.source_name = "MNIST"
         self.target_name = "USPS"
         self.transforms_target = v2.Compose(
@@ -261,7 +259,6 @@ class MNIST_to_MNIST_M:
         self.num_classes = 10
         self.num_channels = 3
         self.input_size = 3072
-        self.dataloader_options = dataloader_options
         self.source_name = "MNIST"
         self.target_name = "MNIST_M"
         self.transforms_source = v2.Compose(
@@ -327,7 +324,6 @@ class MNIST_to_MNIST_M:
 class SVHN_to_MNIST:
     def __init__(self, dataloader_options, test_dataloader_options, class_balanced):
         self.name = "SVHN_TO_MNIST"
-        self.dataloader_options = dataloader_options
         self.source_name = "SVHN"
         self.target_name = "MNIST"
         self.input_size = 3072
@@ -435,7 +431,6 @@ class SVHN_to_MNIST:
 class CIFAR_CORRUPT:
     def __init__(self, dataloader_options, test_dataloader_options, corruptions):
         self.name = "CIFAR10_TO_CIFAR10C"
-        self.dataloader_options = dataloader_options
         self.source_name = "CIFAR10"
         self.target_name = "CIFAR10C"
         self.input_size = 3072
@@ -448,16 +443,16 @@ class CIFAR_CORRUPT:
             [v2.ToImage(), v2.ToDtype(torch.float32, scale=True)]
         )
         self.source_data = datasets.CIFAR10(
-            root="data/CIFAR10", train=True, transform=self.transforms_source
+            root="data/CIFAR10", download=True, train=True, transform=self.transforms_source
         )
 
         X_target = torch.tensor([])
         y_target = torch.tensor([])
         for corruption in corruptions:
             X = torch.from_numpy(
-                np.load("data/CIFAR10-C/" + corruption + ".npy")
+                np.load("data/CIFAR-10-C/" + corruption + ".npy")
             ).permute((0, 3, 1, 2))
-            y = torch.from_numpy(np.load("data/CIFAR10-C/labels.npy")).long()
+            y = torch.from_numpy(np.load("data/CIFAR-10-C/labels.npy")).long()
             X_target = torch.concatenate((X_target, X))
             y_target = torch.concatenate((y_target, y))
         num_targets = X_target.shape[0]
@@ -521,7 +516,6 @@ class OFFICEHOME:
         self.name = "OFFICEHOME"
         self.num_channels = 3
         self.num_classes = 65
-        self.dataloader_options = dataloader_options
         self.input_size = size[0] * size[1]
         operations = [
             v2.ToImage(),
@@ -563,11 +557,10 @@ class OFFICEHOME:
 
 
 class PORTRAITS:
-    def __init__(self, dataloader_options, size=(32, 32), train_ratio=0.8):
+    def __init__(self, dl_options, test_dl_options, size=(32, 32), train_ratio=0.8):
         self.name = "PORTRAITS"
         self.num_channels = 1
         self.num_classes = 2
-        self.dataloader_options = dataloader_options
         self.input_size = size[0] * size[1]
         transforms = v2.Compose(
             [
@@ -610,10 +603,10 @@ class PORTRAITS:
         train_target, test_target = random_split(subset2, [train_size, test_size])
 
         # Load both datasets
-        self.source_dataloader = DataLoader(train_source, **dataloader_options)
-        self.target_dataloader = DataLoader(train_target, **dataloader_options)
-        self.source_test_dataloader = DataLoader(test_source, **test_dataloader_options)
-        self.target_test_dataloader = DataLoader(test_target, **test_dataloader_options)
+        self.source_dataloader = DataLoader(train_source, **dl_options)
+        self.target_dataloader = DataLoader(train_target, **dl_options)
+        self.source_test_dataloader = DataLoader(test_source, **test_dl_options)
+        self.target_test_dataloader = DataLoader(test_target, **test_dl_options)
         # calc_w_distance_label_shift(self)
         self.labels = np.array(["Female", "Male"])
 

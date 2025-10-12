@@ -75,6 +75,8 @@ class WeightedWRR:
         else:
             raise Exception("UOT method NOT implemented!")
         loss = torch.sum(ot_mat * cost_mat)
+        dist_source = torch.cdist(pred_source, pred_source, p=2)
+        dist_target = torch.cdist(pred_target, pred_target, p=2)
 
         w_source = torch.sum(ot_mat, dim=1)
         w_source_loss = torch.sum(w_source * source_losses)

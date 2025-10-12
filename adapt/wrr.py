@@ -25,6 +25,10 @@ class WRR:
         model, self.opt = fabric.setup(model, self.opt)
 
     def calc_ot_loss(self, f_source, f_target):
+        # dist_source = torch.cdist(f_source, f_source, p=2)
+        # dist_target = torch.cdist(f_target, f_target, p=2)
+        # gromov_cost = torch.sqrt(ot.gromov.gromov_wasserstein2(dist_source, dist_target, symmetric=True))
+
         ot_loss = geomloss.SamplesLoss(loss="sinkhorn", p=self.p, blur=self.reg)
         cost = ot_loss(f_source, f_target)
         return cost
@@ -36,7 +40,7 @@ class WRR:
         w_target = torch.ones(num_target, device=device) / num_target
         cost_mat = torch.cdist(f_source, f_target, p=2)
         ot_mat = ot.emd(w_source, w_target, cost_mat, numItermax=5000)
-        return ot_mat
+        return ot_mat, torch.sum(ot_mat * cost_mat)
 
     def adapt(self, model, fabric, X_source, y_source, X_target, y_target=[]):
         self.opt.zero_grad()
@@ -44,7 +48,7 @@ class WRR:
         pred_target = model(X_target)
         source_loss = self.loss_fun(pred_source, y_source)
         if self.propagate_labels is True:
-            ot_map = self.calc_ot_map(pred_source, pred_target, fabric.device)
+            ot_map, _ = self.calc_ot_map(pred_source, pred_target, fabric.device)
             num_target = pred_target.shape[0]
             y_hat_target = (
                 num_target * ot_map.T @ torch.argmax(y_source, dim=1).float()
@@ -53,7 +57,11 @@ class WRR:
                 pred_target, y_hat_target
             )
         else:
-            ot_cost = self.calc_ot_loss(pred_source, pred_target)
+            try:
+                ot_cost = self.calc_ot_loss(pred_source, pred_target)
+            except:
+                print("For some reason geomloss failed. Reverting to ot.emd routine")
+                _, ot_cost = self.calc_ot_map(pred_source, pred_target, fabric.device)
             loss = self.scale * source_loss + ot_cost
         fabric.backward(loss)
         self.opt.step()

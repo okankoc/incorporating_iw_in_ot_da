@@ -10,10 +10,11 @@ from lightning import Fabric
 import utils
 import shifts
 import adapt
+import loss
 from debug import debug_method
 from config.local_config import setup_local_config
 from config.cluster_config import setup_cluster_config
-from load_model import load_model, init_model, pretrain_model, init_lazy_modules, init_lazy_discriminator
+from load_model import load_model, init_model, pretrain_model
 
 
 def reset_all(seed):
@@ -47,7 +48,7 @@ def init_algorithm(config, name, model, loss_fun, opt, scenario, fabric):
         alg = adapt.dann.DANN(config["dann"], fabric, model, loss_fun, scenario)
     if name == "fdal":
         alg = adapt.fdal.FDAL(config["fdal"], fabric, model, loss_fun, scenario)
-    if name == "reverse-kl":
+    if name == "reverse_kl":
         alg = adapt.reverse_kl.ReverseKL(config["reverse_kl"], fabric, model, loss_fun, opt)
         model = alg.model # model is probabilistic representation network in reverse-kl case
     return alg, model
@@ -62,11 +63,10 @@ def run_uda(config, fabric):
         num_methods, num_runs, num_epochs+1, 4)
 
     # Run adaptation
-    loss_fun = config["loss"]
     scenario = shifts.init_scenario(config, fabric)
     model = init_model(config, scenario)
-    init_lazy_modules(model, scenario)
     scenario = setup_fabric_dataloaders(fabric, scenario)
+    loss_fun = init_loss(config)
     opt = init_opt(config, model)
     results = pretrain_model(model, config, fabric, scenario, loss_fun, opt, results)
 
@@ -74,7 +74,8 @@ def run_uda(config, fabric):
     for i in range(num_methods):
         for j in range(num_runs):
             reset_all(seed=j)
-            model = load_model(config, fabric, scenario, loss_fun)
+            model = load_model(config, fabric, scenario)
+            loss_fun = init_loss(config)
             opt = init_opt(config, model)
             alg, model = init_algorithm(config, methods[i], model, loss_fun, opt, scenario, fabric)
             print("===============================")
@@ -115,6 +116,18 @@ def run_uda(config, fabric):
                     fabric,
                 )
     return results
+
+
+def init_loss(config):
+    if config["loss"] == "margin":
+        loss_fun = loss.MarginLoss()
+    elif config["loss"] == "euclidean":
+        loss_fun = loss.EuclideanLoss()
+    elif config["loss"] == "cross-entropy":
+        loss_fun = loss.CELoss()
+    else:
+        raise Exception("Loss function not implemented!")
+    return loss_fun
 
 
 # For now we assume that all algorithms share the optimizer, but we can change that later
@@ -180,16 +193,15 @@ def run_on_cluster():
 
     if fabric.global_rank != 0:
         import builtins
-
         builtins.print = lambda *args, **kwargs: None
 
     print(f"Fabric device: {fabric.device}")
     reset_all(seed=0)
 
     # Run all experiments
-    models = ["MLP", "ConvNet", "ResNet"]
-    dann_layers = [-2, "flatten", -1] # ignored for ResNet
-    scenarios = ["MNIST_TO_USPS", "USPS_TO_MNIST", "MNIST_TO_MNIST_M", "SVHN_TO_MNIST"]
+    models = ["ConvNet", "ResNet"]
+    dann_layers = ["flatten", -1] # ignored for ResNet
+    scenarios = ['MNIST_TO_USPS', 'USPS_TO_MNIST', 'MNIST_TO_MNIST_M', 'SVHN_TO_MNIST']
     for i, model in enumerate(models):
         if model == "ResNet":
             config["optimizer"] = "sgd"
@@ -225,5 +237,5 @@ if __name__ == "__main__":
     # torch.set_printoptions(precision=3, sci_mode=False)
     # torch.autograd.set_detect_anomaly(True)
 
-    # run_on_local()
-    run_on_cluster()
+    run_on_local()
+    # run_on_cluster()
