@@ -34,23 +34,25 @@ def init_algorithm(config, name, model, loss_fun, opt, scenario, fabric):
     # Prepare adaptation methods
     if name == "wrr":
         alg = adapt.wrr.WRR(config["wrr"], fabric, model, loss_fun, opt)
-    if name == "weighted_wrr":
+    elif name == "weighted_wrr":
         alg = adapt.weighted_wrr.WeightedWRR(config["weighted_wrr"], fabric, model, loss_fun, opt)
-    if name == "cons_wrr":
+    elif name == "cons_wrr":
         alg = adapt.constrained_wrr.ConstrainedWRR(config["cons_wrr"], fabric, model, loss_fun, opt)
-    if name == "lje":
+    elif name == "lje":
         alg = adapt.oracle.OracleLJE(fabric, model, loss_fun, opt)
-    if name == "cc":
+    elif name == "cc":
         alg = adapt.oracle.OracleCC(config["cc"], fabric, model, loss_fun, opt)
-    if name == "erm":
+    elif name == "erm":
         alg = adapt.erm.ERM(model, fabric, loss_fun, opt)
-    if name == "dann":
+    elif name == "dann":
         alg = adapt.dann.DANN(config["dann"], fabric, model, loss_fun, scenario)
-    if name == "fdal":
+    elif name == "fdal":
         alg = adapt.fdal.FDAL(config["fdal"], fabric, model, loss_fun, scenario)
-    if name == "reverse_kl":
+    elif name == "reverse_kl":
         alg = adapt.reverse_kl.ReverseKL(config["reverse_kl"], fabric, model, loss_fun, opt)
         model = alg.model # model is probabilistic representation network in reverse-kl case
+    else:
+        raise Exception('UDA method not found!')
     return alg, model
 
 
@@ -199,14 +201,12 @@ def run_on_cluster():
     reset_all(seed=0)
 
     # Run all experiments
-    models = ["ConvNet", "ResNet"]
-    dann_layers = ["flatten", -1] # ignored for ResNet
-    scenarios = ['MNIST_TO_USPS', 'USPS_TO_MNIST', 'MNIST_TO_MNIST_M', 'SVHN_TO_MNIST']
-    for i, model in enumerate(models):
+    dann_layers = [-2, "flatten", -1] # ignored for ResNet
+    for i, model in enumerate(config["models"]):
         if model == "ResNet":
             config["optimizer"] = "sgd"
             config["learning_rate"] = 1e-4
-        for scenario in scenarios:
+        for scenario in config["scenarios"]:
             config["model"] = model
             config["scenario"] = scenario
             config["dann"]["layer_to_apply_disc"] = dann_layers[i]
@@ -237,5 +237,5 @@ if __name__ == "__main__":
     # torch.set_printoptions(precision=3, sci_mode=False)
     # torch.autograd.set_detect_anomaly(True)
 
-    run_on_local()
-    # run_on_cluster()
+    # run_on_local()
+    run_on_cluster()

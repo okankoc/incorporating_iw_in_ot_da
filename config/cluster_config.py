@@ -3,7 +3,7 @@ def setup_cluster_config():
         # Experiment details
         "device": "auto",  # 'cpu' or 'auto' to find gpu automatically
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        "model": "ResNet",
+        "models": ["MLP", "ConvNet", "ResNet"],
         "resnet_size": 18,  # 18 or 50
         "pretrain": True,
         "num_pretrain_epochs": 5,  # if pretrain is True
@@ -15,11 +15,11 @@ def setup_cluster_config():
         # Data loader options
         "batch_size": 64,
         # Distribution shift scenario (MNIST_TO_USPS, CIFAR10C, ...)
-        "scenario": "MNIST_TO_USPS",
+        "scenarios": ["MNIST_TO_USPS", "USPS_TO_MNIST", "MNIST_TO_MNIST_M", "SVHN_TO_MNIST"],
         "cifar-10-corruptions": ["fog", "frost", "snow"],
         "class_balanced": False,
         "num_epochs": 5,
-        "num_runs": 5,
+        "num_runs": 3,
         "algs": [
             "wrr",
             "weighted_wrr",
@@ -28,7 +28,7 @@ def setup_cluster_config():
             "erm",
             "cc",
             "dann",
-            "reverse-kl",
+            "reverse_kl",
         ],  # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
 
         # Debugging algorithms
