@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import copy
-
+import load_model
 
 class ProbModel(nn.Module):
     # Take the last penultimate fc layer

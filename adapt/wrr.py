@@ -8,7 +8,7 @@ import numpy as np
 from scipy.spatial.distance import cdist
 import geomloss
 import copy
-import ot  # We don't need POT if we don't need to compute entanglement!
+import ot
 
 
 # Wasserstein Marginal Distance regularized source risk minimization using model outputs

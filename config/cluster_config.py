@@ -33,7 +33,8 @@ def setup_cluster_config():
 
         # Debugging algorithms
         "debug": False,
-        "print_every_n": 50,
+        "print_every_n": 10,
+        "n_batches_per_epoch": -1, # if -1 uses all batches
         "report_source_train_risk": False,
         "report_target_train_risk": False,
         "pretrain_on_both": False,  # starting from a model that 'cheats'!
@@ -115,7 +116,7 @@ def setup_alg_config(config):
     reverse_kl_config = {
         "alpha_reverse": 0.1,
         "alpha_forward": 0.1,
-        "augment_softmax": 0.001,
+        "augment_softmax": 0.0,
     }
 
     config["wrr"] = wrr_config

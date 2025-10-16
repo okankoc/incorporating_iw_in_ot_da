@@ -38,10 +38,10 @@ def test(dataloader, model, loss_fun, fabric):
             )
             correct += (pred.argmax(1) == y).sum()
             num_points += y.size(0)
-    test_loss = fabric.all_reduce(test_loss, reduce_op='sum')
-    correct = fabric.all_reduce(correct, reduce_op='sum')
     num_points = fabric.all_reduce(num_points, reduce_op='sum')
-    print(f"Accuracy: {(100*correct/num_points):0.2f}%, Avg loss: {test_loss/num_points:.6f} \n")
+    test_loss = fabric.all_reduce(test_loss, reduce_op='sum') / num_points
+    correct = fabric.all_reduce(correct, reduce_op='sum') / num_points
+    print(f"Accuracy: {(100*correct):0.2f}%, Avg loss: {test_loss:.6f} \n")
     return test_loss, correct
 
 

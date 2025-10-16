@@ -2,16 +2,13 @@ import torch
 import copy
 import torch.nn.functional as F
 
-from models.prob_model import ProbModel
-
 
 class ReverseKL:
     def __init__(self, config, fabric, model, loss_fun, opt):
         super(ReverseKL, self).__init__()
         self.loss_fun = copy.deepcopy(loss_fun)
-        model = ProbModel(model)
-        self.model, self.opt = fabric.setup(model, opt)
-        self.model.mark_forward_method('forward_distr')
+        model, self.opt = fabric.setup(model, opt)
+        model.mark_forward_method('forward_distr')
         self.name = "Reverse-KL"
         self.alpha_reverse = config[
             "alpha_reverse"
@@ -76,6 +73,7 @@ class ReverseKL:
         self.opt.step()
         self.opt.zero_grad()
 
+    @torch.no_grad()
     def validate(self, model, fabric, X_source, y_source, X_target, y_target=[]):
         mean_s, std_s, sample_s, out_s, distr_s = model.forward_distr(X_source)
         mean_t, std_t, sample_t, out_t, distr_t = model.forward_distr(X_target)

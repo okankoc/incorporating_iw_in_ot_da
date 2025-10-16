@@ -45,8 +45,16 @@ def init_model(config, scenario):
     elif config["model"] == "ResNet":
         model = init_resnet(config["resnet_size"], scenario.num_channels, scenario.num_classes)
     init_lazy_modules(model, scenario)
+    disable_inplace_activations(model)
     print(f"Initialized model {model.name}")
     return model
+
+
+def disable_inplace_activations(model):
+    for m in model.modules():
+        if isinstance(m, (nn.ReLU, nn.LeakyReLU, nn.GELU, nn.SiLU)):
+            if hasattr(m, "inplace") and m.inplace:
+                m.inplace = False
 
 
 def init_resnet(size, num_inp_channels, num_classes):

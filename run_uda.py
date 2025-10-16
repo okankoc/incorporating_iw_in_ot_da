@@ -15,6 +15,7 @@ from debug import debug_method
 from config.local_config import setup_local_config
 from config.cluster_config import setup_cluster_config
 from load_model import load_model, init_model, pretrain_model
+from models.prob_model import ProbModel
 
 
 def reset_all(seed):
@@ -49,8 +50,8 @@ def init_algorithm(config, name, model, loss_fun, opt, scenario, fabric):
     elif name == "fdal":
         alg = adapt.fdal.FDAL(config["fdal"], fabric, model, loss_fun, scenario)
     elif name == "reverse_kl":
+        model = ProbModel(model)
         alg = adapt.reverse_kl.ReverseKL(config["reverse_kl"], fabric, model, loss_fun, opt)
-        model = alg.model # model is probabilistic representation network in reverse-kl case
     else:
         raise Exception('UDA method not found!')
     return alg, model
@@ -85,13 +86,13 @@ def run_uda(config, fabric):
             for epoch in range(num_epochs):
                 batch_idx = 0
                 print(f"Epoch {epoch+1}")
+                print(f"Number of batches: {len(scenario.source_dataloader)}")
                 for (X_train, y_train), (X_shift, y_shift) in zip(
                     scenario.source_dataloader, scenario.target_dataloader
                 ):
                     y_train = utils.one_hot(y_train, scenario.num_classes)
                     y_shift = utils.one_hot(y_shift, scenario.num_classes)
-                    if batch_idx % 10 == 0:
-                        print(f"Batch id: {batch_idx}")
+                    print(f"Batch id: {batch_idx}")
                     alg.adapt(model, fabric, X_train, y_train, X_shift, y_shift)
                     if config["debug"] is True and (
                         batch_idx % config["print_every_n"] == 0
@@ -106,6 +107,9 @@ def run_uda(config, fabric):
                             batch_idx / config["print_every_n"],
                         )
                     batch_idx += 1
+                    if config['n_batches_per_epoch'] != -1 and batch_idx % config['n_batches_per_epoch'] == 0:
+                        print('Terminating epoch early for debugging purposes...')
+                        break
 
                 print("===============================")
                 print(f"Algorithm {alg.name}")
@@ -165,9 +169,10 @@ def setup_fabric_dataloaders(fabric, scenario):
 
 
 def save_results(results, config):
-    os.makedirs("results", exist_ok=True)
-    model_name = config["model"]
     scenario_name = config["scenario"]
+    model_name = config["model"]
+    folder_name = os.path.join('results', scenario_name, model_name)
+    os.makedirs(folder_name, exist_ok=True)
     methods = config["algs"]
     num_methods, num_runs, num_epochs, _ = results.shape
     metrics = ["loss_source", "acc_source", "loss_target", "acc_target"]
@@ -175,17 +180,18 @@ def save_results(results, config):
     data = {'config': config}
     for m, metric in enumerate(metrics):
         data[metric] = {}
-        save_name = "results/" + scenario_name + "_" + model_name + "_" + metric
+        save_name = metric
         fig, ax = plt.subplots()
         for i, method in enumerate(methods):
             data[metric][method] = results[i, :, :, m]
             stds, means = torch.std_mean(results[i, :, :, m], dim=0)
             ax.errorbar(x=np.arange(num_epochs), y=means, yerr=stds, label=method)
-        ax.legend(loc="upper right")
+        ax.legend(loc="lower right")
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
-        plt.savefig(save_name + ".pdf", format="pdf")
-    torch.save(data, "results/" + scenario_name + "_" + model_name + ".pth")
+        plt.savefig(os.path.join(folder_name, metric + ".pdf"), format="pdf")
+    print(f"Saving metric plots and data in folder {folder_name}")
+    torch.save(data, os.path.join(folder_name, "metrics.pth"))
 
 
 def run_on_cluster():
@@ -219,10 +225,10 @@ def run_on_local():
     fabric = Fabric(accelerator=config["device"], devices="auto", strategy="auto")
     fabric.launch()
 
-    if fabric.global_rank != 0:
-        import builtins
+    # if fabric.global_rank != 0:
+    #     import builtins
 
-        builtins.print = lambda *args, **kwargs: None
+    #     builtins.print = lambda *args, **kwargs: None
 
     print(f"Fabric device: {fabric.device}")
     reset_all(seed=0)
@@ -235,7 +241,8 @@ def run_on_local():
 if __name__ == "__main__":
     torch.set_default_dtype(torch.float32)
     # torch.set_printoptions(precision=3, sci_mode=False)
-    # torch.autograd.set_detect_anomaly(True)
+    torch.autograd.set_detect_anomaly(True)
+    os.environ["TORCH_SHOW_CPP_STACKTRACES"] = "1"
 
-    # run_on_local()
-    run_on_cluster()
+    run_on_local()
+    # run_on_cluster()

@@ -1,13 +1,13 @@
 def setup_local_config():
     config = {
         # Experiment details
-        "device": "auto",  # 'cpu' or 'auto' to find gpu automatically
+        "device": "cpu",  # 'cpu' or 'auto' to find gpu automatically
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        "model": "ResNet",
+        "model": "MLP",
         "resnet_size": 18,  # 18 or 50
         "pretrain": True,
-        "num_pretrain_epochs": 5,  # if pretrain is True
-        "loss": "margin",  # MarginLoss(), EuclideanLoss(), CELoss()
+        "num_pretrain_epochs": 3,  # if pretrain is True
+        "loss": "margin",  # 'margin', 'euclidean', 'cross-entropy'
         "optimizer": "adam",  # alternatives: adam, sgd
         "learning_rate": 1e-3,  # use 1e-4 for ResNets or a learning scheduler
         "momentum": 0.9,  # for SGD
@@ -15,19 +15,19 @@ def setup_local_config():
         # Data loader options
         "batch_size": 64,
         # Distribution shift scenario (MNIST_TO_USPS, CIFAR10C, ...)
-        "scenario": "CIFAR-10-C",
+        "scenario": "MNIST_TO_USPS",
         "cifar-10-corruptions": ["fog", "frost", "snow"],
         "class_balanced": False,
         "num_epochs": 1,
         "num_runs": 1,
         "algs": [
             "wrr",
-            "weighted_wrr",
         ],  # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
         # Debugging algorithms
 
         "debug": True,
         "print_every_n": 50,
+        "n_batches_per_epoch": 200, # if -1 uses all batches
         "report_source_train_risk": False,
         "report_target_train_risk": False,
         "pretrain_on_both": False,  # starting from a model that 'cheats'!
@@ -107,8 +107,8 @@ def setup_alg_config(config):
     }
 
     reverse_kl_config = {
-        "alpha_reverse": 0.0,
-        "alpha_forward": 0.0,
+        "alpha_reverse": 0.1,
+        "alpha_forward": 0.1,
         "augment_softmax": 0.0,
     }
 

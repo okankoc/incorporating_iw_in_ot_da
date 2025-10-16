@@ -6,9 +6,7 @@ import utils
 
 
 def debug_method(config, method, model, loss_fun, scenario, fabric, idx_des):
-    num_batches = (
-        len(scenario.source_test_dataloader.dataset) / config["test_batch_size"]
-    )
+    num_batches = len(scenario.source_test_dataloader)
     idx_des = idx_des % num_batches
     idx = 0
     for (X_train, y_train), (X_shift, y_shift) in zip(
@@ -237,8 +235,8 @@ def calc_ot(f_source, f_target, fabric, reg=1e-6):
     num_target = f_target.shape[0]
 
     ### Python crashes regularly with POT so switching to GeomLoss
-    ot_loss = geomloss.SamplesLoss(loss="sinkhorn", p=1, blur=reg)
-    cost = ot_loss(f_source, f_target)
+    # ot_loss = geomloss.SamplesLoss(loss="sinkhorn", p=1, blur=reg)
+    # cost = ot_loss(f_source, f_target)
 
     # The problem with using POT is that Sinkhorn is not converging for low reg.
     # and it doesn't seem possible to get a numerically accurate ot_mat from geomloss!
@@ -247,5 +245,6 @@ def calc_ot(f_source, f_target, fabric, reg=1e-6):
     w_target = torch.ones(num_target, device=fabric.device) / num_target
     cost_mat = torch.cdist(f_source, f_target, p=2)
     ot_mat = ot.emd(w_source, w_target, cost_mat, numItermax=5000)
+    cost = torch.sum(ot_mat * cost_mat)
 
     return cost, ot_mat

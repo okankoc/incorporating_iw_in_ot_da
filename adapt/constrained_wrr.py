@@ -37,6 +37,7 @@ class ConstrainedWRR:
             source_loss = self.loss_fun(pred_source, y_source)
             loss = source_loss + self.scale * ot_cost
             fabric.backward(loss)
+        self.opt.step()
 
     @torch.no_grad()
     def validate(self, model, fabric, X_source, y_source, X_target):
