@@ -17,7 +17,6 @@ def setup_local_config():
         # Distribution shift scenario (MNIST_TO_USPS, CIFAR10C, ...)
         "scenario": "MNIST_TO_USPS",
         "cifar-10-corruptions": ["fog", "frost", "snow"],
-        "class_balanced": False,
         "num_epochs": 1,
         "num_runs": 1,
         "algs": [

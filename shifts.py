@@ -26,13 +26,11 @@ def init_scenario(config, fabric):
     if config["scenario"] == "MNIST_TO_USPS":
         scenario = MNIST_to_USPS(
             dataloader_options,
-            test_dataloader_options,
-            use_sampler=True,
-            class_balanced=config["class_balanced"],
+            test_dataloader_options
         )
     elif config["scenario"] == "USPS_TO_MNIST":
         scenario = USPS_to_MNIST(
-            dataloader_options, test_dataloader_options, use_sampler=True
+            dataloader_options, test_dataloader_options
         )
     elif config["scenario"] == "MNIST_TO_MNIST_M":
         scenario = MNIST_to_MNIST_M(
@@ -41,8 +39,7 @@ def init_scenario(config, fabric):
     elif config["scenario"] == "SVHN_TO_MNIST":
         scenario = SVHN_to_MNIST(
             dataloader_options,
-            test_dataloader_options,
-            class_balanced=config["class_balanced"],
+            test_dataloader_options
         )
     elif config["scenario"] == "CIFAR-10-C":
         scenario = CIFAR_CORRUPT(
@@ -92,15 +89,12 @@ class USPS_to_MNIST:
         )
 
         # Load both datasets
-        if use_sampler is True:
-            sampler = RandomSampler(
-                self.source_data, replacement=True, num_samples=len(self.target_data)
-            )
-            self.source_dataloader = DataLoader(
-                self.source_data, sampler=sampler, **dataloader_options
-            )
-        else:
-            self.source_dataloader = DataLoader(self.source_data, **dataloader_options)
+        sampler = RandomSampler(
+            self.source_data, replacement=True, num_samples=len(self.target_data)
+        )
+        self.source_dataloader = DataLoader(
+            self.source_data, sampler=sampler, **dataloader_options
+        )
         self.target_dataloader = DataLoader(self.target_data, **dataloader_options)
 
         test_data = datasets.USPS(
@@ -161,91 +155,30 @@ class MNIST_to_USPS:
         )
 
         # Load both datasets
-        if use_sampler is True:
-            if class_balanced is True:
-                source_class_weights = (
-                    1.0 / torch.bincount(torch.tensor(self.source_data.targets)).float()
-                )
-                source_sample_weights = source_class_weights[self.source_data.targets]
-                source_sampler = WeightedRandomSampler(
-                    weights=source_sample_weights,
-                    num_samples=len(source_sample_weights),
-                    replacement=True,
-                )
-                self.source_dataloader = DataLoader(
-                    self.source_data, sampler=source_sampler, **dataloader_options
-                )
-                target_class_weights = (
-                    1.0 / torch.bincount(torch.tensor(self.target_data.targets)).float()
-                )
-                target_sample_weights = target_class_weights[self.target_data.targets]
-                target_sampler = WeightedRandomSampler(
-                    weights=target_sample_weights,
-                    num_samples=len(self.source_data),
-                    replacement=True,
-                )
-                self.target_dataloader = DataLoader(
-                    self.target_data, sampler=target_sampler, **dataloader_options
-                )
-
-                source_class_weights = (
-                    1.0 / torch.bincount(torch.tensor(source_test_data.targets)).float()
-                )
-                source_sample_weights = source_class_weights[source_test_data.targets]
-                source_sampler = WeightedRandomSampler(
-                    weights=source_sample_weights,
-                    num_samples=len(source_sample_weights),
-                    replacement=True,
-                )
-                self.source_test_dataloader = DataLoader(
-                    source_test_data, sampler=source_sampler, **test_dataloader_options
-                )
-                target_class_weights = (
-                    1.0 / torch.bincount(torch.tensor(target_test_data.targets)).float()
-                )
-                target_sample_weights = target_class_weights[target_test_data.targets]
-                target_sampler = WeightedRandomSampler(
-                    weights=target_sample_weights,
-                    num_samples=len(source_test_data),
-                    replacement=True,
-                )
-                self.target_test_dataloader = DataLoader(
-                    target_test_data, sampler=target_sampler, **test_dataloader_options
-                )
-            else:
-                self.source_dataloader = DataLoader(
-                    self.source_data, **dataloader_options
-                )
-                self.source_test_dataloader = DataLoader(
-                    source_test_data, **test_dataloader_options
-                )
-                target_sampler = RandomSampler(
-                    self.target_data,
-                    replacement=True,
-                    num_samples=len(self.source_data),
-                )
-                self.target_dataloader = DataLoader(
-                    self.target_data, sampler=target_sampler, **dataloader_options
-                )
-                target_test_sampler = RandomSampler(
-                    target_test_data,
-                    replacement=True,
-                    num_samples=len(source_test_data),
-                )
-                self.target_test_dataloader = DataLoader(
-                    target_test_data,
-                    sampler=target_test_sampler,
-                    **test_dataloader_options,
-                )
-        else:
-            self.source_dataloader = DataLoader(self.source_data, **dataloader_options)
-            self.target_dataloader = DataLoader(self.target_data, **dataloader_options)
-            self.source_test_dataloader = DataLoader(
-                source_test_data, **test_dataloader_options
-            )
-            self.target_test_dataloader = DataLoader(
-                target_test_data, **test_dataloader_options
-            )
+        self.source_dataloader = DataLoader(
+            self.source_data, **dataloader_options
+        )
+        self.source_test_dataloader = DataLoader(
+            source_test_data, **test_dataloader_options
+        )
+        target_sampler = RandomSampler(
+            self.target_data,
+            replacement=True,
+            num_samples=len(self.source_data),
+        )
+        self.target_dataloader = DataLoader(
+            self.target_data, sampler=target_sampler, **dataloader_options
+        )
+        target_test_sampler = RandomSampler(
+            target_test_data,
+            replacement=True,
+            num_samples=len(source_test_data),
+        )
+        self.target_test_dataloader = DataLoader(
+            target_test_data,
+            sampler=target_test_sampler,
+            **test_dataloader_options,
+        )
         # calc_w_distance_label_shift(self)
         self.labels = np.array([str(i) for i in range(10)])
 
@@ -359,66 +292,14 @@ class SVHN_to_MNIST:
             root="data", train=False, download=True, transform=self.transforms_target
         )
 
-        # Load both datasets
-        if class_balanced is True:
-            source_class_weights = (
-                1.0 / torch.bincount(torch.tensor(self.source_data.labels)).float()
-            )
-            source_sample_weights = source_class_weights[self.source_data.labels]
-            source_sampler = WeightedRandomSampler(
-                weights=source_sample_weights,
-                num_samples=len(source_sample_weights),
-                replacement=True,
-            )
-            self.source_dataloader = DataLoader(
-                self.source_data, sampler=source_sampler, **dataloader_options
-            )
-            target_class_weights = (
-                1.0 / torch.bincount(torch.tensor(self.target_data.targets)).float()
-            )
-            target_sample_weights = target_class_weights[self.target_data.targets]
-            target_sampler = WeightedRandomSampler(
-                weights=target_sample_weights,
-                num_samples=len(target_sample_weights),
-                replacement=True,
-            )
-            self.target_dataloader = DataLoader(
-                self.target_data, sampler=target_sampler, **dataloader_options
-            )
-
-            source_class_weights = (
-                1.0 / torch.bincount(torch.tensor(source_test_data.labels)).float()
-            )
-            source_sample_weights = source_class_weights[source_test_data.labels]
-            source_test_sampler = WeightedRandomSampler(
-                weights=source_sample_weights,
-                num_samples=len(source_sample_weights),
-                replacement=True,
-            )
-            self.source_test_dataloader = DataLoader(
-                source_test_data, sampler=source_test_sampler, **test_dataloader_options
-            )
-            target_class_weights = (
-                1.0 / torch.bincount(torch.tensor(target_test_data.targets)).float()
-            )
-            target_sample_weights = target_class_weights[target_test_data.targets]
-            target_test_sampler = WeightedRandomSampler(
-                weights=target_sample_weights,
-                num_samples=len(target_sample_weights),
-                replacement=True,
-            )
-            self.target_test_dataloader = DataLoader(
-                target_test_data, sampler=target_test_sampler, **test_dataloader_options
-            )
-        else:
-            self.source_dataloader = DataLoader(self.source_data, **dataloader_options)
-            self.target_dataloader = DataLoader(self.target_data, **dataloader_options)
-            self.source_test_dataloader = DataLoader(
-                source_test_data, **test_dataloader_options
-            )
-            self.target_test_dataloader = DataLoader(
-                target_test_data, **test_dataloader_options
-            )
+        self.source_dataloader = DataLoader(self.source_data, **dataloader_options)
+        self.target_dataloader = DataLoader(self.target_data, **dataloader_options)
+        self.source_test_dataloader = DataLoader(
+            source_test_data, **test_dataloader_options
+        )
+        self.target_test_dataloader = DataLoader(
+            target_test_data, **test_dataloader_options
+        )
         # calc_w_distance_label_shift(self)
         self.labels = np.array([str(i) for i in range(10)])
 

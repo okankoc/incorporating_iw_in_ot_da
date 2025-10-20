@@ -17,7 +17,6 @@ def setup_cluster_config():
         # Distribution shift scenario (MNIST_TO_USPS, CIFAR10C, ...)
         "scenarios": ["MNIST_TO_USPS", "USPS_TO_MNIST", "MNIST_TO_MNIST_M", "SVHN_TO_MNIST"],
         "cifar-10-corruptions": ["fog", "frost", "snow"],
-        "class_balanced": False,
         "num_epochs": 5,
         "num_runs": 3,
         "algs": [

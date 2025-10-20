@@ -225,10 +225,10 @@ def run_on_local():
     fabric = Fabric(accelerator=config["device"], devices="auto", strategy="auto")
     fabric.launch()
 
-    # if fabric.global_rank != 0:
-    #     import builtins
+    if fabric.global_rank != 0:
+        import builtins
 
-    #     builtins.print = lambda *args, **kwargs: None
+        builtins.print = lambda *args, **kwargs: None
 
     print(f"Fabric device: {fabric.device}")
     reset_all(seed=0)
@@ -241,8 +241,8 @@ def run_on_local():
 if __name__ == "__main__":
     torch.set_default_dtype(torch.float32)
     # torch.set_printoptions(precision=3, sci_mode=False)
-    torch.autograd.set_detect_anomaly(True)
-    os.environ["TORCH_SHOW_CPP_STACKTRACES"] = "1"
+    # torch.autograd.set_detect_anomaly(True)
+    # os.environ["TORCH_SHOW_CPP_STACKTRACES"] = "1"
 
     run_on_local()
     # run_on_cluster()
