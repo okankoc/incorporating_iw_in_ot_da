@@ -1,7 +1,6 @@
 import copy
 import torch
 from torch import nn
-import torch.nn.functional as F
 
 
 # Modified from DANN script

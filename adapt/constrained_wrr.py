@@ -16,9 +16,6 @@ class ConstrainedWRR:
         model, self.opt = fabric.setup(model, self.opt)
 
     def calc_ot(self, f_source, f_target):
-        num_source = f_source.shape[0]
-        num_target = f_target.shape[0]
-
         ### Python crashes regularly with POT so switching to GeomLoss
         ot_loss = geomloss.SamplesLoss(loss="sinkhorn", p=self.p, blur=self.reg)
         return ot_loss(f_source, f_target)

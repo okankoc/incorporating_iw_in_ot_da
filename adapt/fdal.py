@@ -1,7 +1,4 @@
 import torch
-from torch import nn
-import copy
-import torch.nn.utils.spectral_norm as sn
 
 from fDAL import fDALLearner
 from models.conv import ConvDomainClassifier

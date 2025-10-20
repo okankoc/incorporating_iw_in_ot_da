@@ -1,4 +1,3 @@
-import copy
 import torch
 from torch import nn
 from torch.autograd import Function
@@ -33,10 +32,14 @@ class DANN(nn.Module):
         else:
             raise Exception("Unknown domain classifier!")
 
-        if 'conv' in model.name:
+        if "conv" in model.name:
             model.track_features(config["conv_feat_layer"])
-        elif model.name == 'MLP':
+        elif model.name == "MLP":
             model.track_features(config["mlp_feat_layer"])
+        elif 'RESNET' in model.name:
+            model.track_features(-1)
+        else:
+            raise Exception('Model not found!')
         init_lazy_discriminator(discr, model, scenario, use_features=True)
         self.discriminator = discr
         self.model = model

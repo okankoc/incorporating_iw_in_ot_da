@@ -18,9 +18,9 @@ def load_model(config, fabric, scenario):
         model.load_state_dict(torch.load(save_path, weights_only=True))
         print(f"Saved model found! Loading parameters from file: {save_path}")
     except:
-        print(f"Saved model NOT found!")
+        print(f"Saved model {model.name} NOT found!")
     model.train()
-    if config["adapt_only_last_layer"] == True:
+    if config["adapt_only_last_layer"]:
         num_layers = len(list(model.parameters()))
         for i, p in enumerate(model.parameters()):
             if i < num_layers - 1:
@@ -47,7 +47,7 @@ def init_model(config, scenario):
             config["resnet_size"], scenario.num_channels, scenario.num_classes
         )
     else:
-        raise Exception('Model not found')
+        raise Exception("Model not found")
     init_lazy_modules(model, scenario)
     disable_inplace_activations(model)
     print(f"Initialized model {model.name}")
@@ -133,7 +133,7 @@ def pretrain_model(model, config, fabric, scenario, loss_fun, opt, res):
         print(f"Saved model found! Loading parameters from file: {save_path}")
         model = fabric.setup(model)
     except:
-        print(f"Saved model NOT found!")
+        print(f"Saved model {model.name} NOT found!")
         if config["pretrain"] is True:
             model, opt = fabric.setup(model, opt)
             print(f"Pretraining {config['num_pretrain_epochs']} epochs...")

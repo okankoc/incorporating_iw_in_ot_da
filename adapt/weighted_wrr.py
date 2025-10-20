@@ -1,15 +1,5 @@
 # Domain adaptation approaches
-import time
-import copy
 import torch
-from torch import nn
-from torch.autograd import Function
-import torch.distributions
-import torch.nn.functional as F
-import numpy as np
-from scipy.spatial.distance import cdist
-import geomloss
-import copy
 import ot
 from sinkhorn_uot import mm_unbalanced
 
@@ -17,7 +7,7 @@ from sinkhorn_uot import mm_unbalanced
 # Weighted Wassertein regularized risk
 class WeightedWRR:
     def __init__(self, config, fabric, model, loss_fun, opt):
-        self.loss_fun = copy.deepcopy(loss_fun)
+        self.loss_fun = loss_fun
         self.name = "weighted-WRR"
         self.opt = opt
         self.scale = config["scale"]
@@ -53,7 +43,7 @@ class WeightedWRR:
 
         if self.uot_alg == "mm":
             ot_mat_init = None
-            if self.uot_init == True:
+            if self.uot_init:
                 ot_mat_init = (
                     torch.softmax(-cost_mat / self.reg, dim=0) * w_target[None, :]
                 )
@@ -75,9 +65,6 @@ class WeightedWRR:
         else:
             raise Exception("UOT method NOT implemented!")
         loss = torch.sum(ot_mat * cost_mat)
-        dist_source = torch.cdist(pred_source, pred_source, p=2)
-        dist_target = torch.cdist(pred_target, pred_target, p=2)
-
         w_source = torch.sum(ot_mat, dim=1)
         w_source_loss = torch.sum(w_source * source_losses)
         return loss, ot_mat, w_source_loss

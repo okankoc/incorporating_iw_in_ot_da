@@ -4,6 +4,8 @@ from torch.utils.data import DataLoader
 from torchvision import datasets
 from torchvision.transforms import v2
 
+import utils
+
 
 class CIFAR_CORRUPT:
     def __init__(self, dataloader_options, test_dataloader_options, corruptions):

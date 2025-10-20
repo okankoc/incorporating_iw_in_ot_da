@@ -3,7 +3,7 @@ def setup_cluster_config():
         # Experiment details
         "device": "auto",  # 'cpu' or 'auto' to find gpu automatically
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        "models": ["ConvNet", "ResNet"],
+        "models": ["ResNet"],
         "resnet_size": 18,  # 18 or 50
         "pretrain": True,
         "num_pretrain_epochs": 5,  # if pretrain is True
@@ -96,7 +96,7 @@ def setup_alg_config(config):
 
     dann_config = {
         "conv_feat_layer": "flatten",
-        "mlp_feat_layer": -2, # ignored for ResNets
+        "mlp_feat_layer": -2,  # ignored for ResNets
         "discriminator": "conv",  # conv or mlp
         "learning_rate": 1e-3,  # for the internal optimizer
         "weight_decay": 0.0,

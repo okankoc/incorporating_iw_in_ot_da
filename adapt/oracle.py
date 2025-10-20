@@ -4,7 +4,7 @@ import geomloss
 
 class OracleLJE:
     def __init__(self, fabric, model, loss_fun, opt):
-        self.name = "LJE"  # low-joint-error
+        self.name = "LJE oracle"  # low-joint-error
         print(f"Initializing Oracle as {self.name}")
         self.loss_fun = loss_fun
         self.opt = opt
@@ -27,7 +27,7 @@ class OracleLJE:
 
 class OracleCC:
     def __init__(self, config, fabric, model, loss_fun, opt):
-        self.name = "CC"  # close-conditionals
+        self.name = "CC oracle"  # close-conditionals
         print(f"Initializing Oracle as {self.name}")
         self.loss_fun = loss_fun
         self.opt = opt
@@ -55,7 +55,7 @@ class OracleCC:
             dist = self.calc_weighted_joint_wrr_dist(
                 model, fabric, pred_source, y_source, pred_target, y_target
             )
-            if self.add_source_loss == True:
+            if self.add_source_loss:
                 loss += dist
             else:
                 loss = dist

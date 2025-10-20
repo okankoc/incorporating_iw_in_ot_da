@@ -3,7 +3,6 @@
 import os
 import numpy as np
 import torch
-import matplotlib
 import matplotlib.pyplot as plt
 from lightning import Fabric
 
@@ -238,7 +237,6 @@ def save_results(results, config):
     data = {"config": config}
     for m, metric in enumerate(metrics):
         data[metric] = {}
-        save_name = metric
         fig, ax = plt.subplots()
         for i, method in enumerate(methods):
             data[metric][method] = results[i, :, :, m]

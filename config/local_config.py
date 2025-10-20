@@ -85,7 +85,7 @@ def setup_alg_config(config):
 
     dann_config = {
         "conv_feat_layer": "flatten",
-        "mlp_feat_layer": -2, # ignored for ResNets
+        "mlp_feat_layer": -2,  # ignored for ResNets
         "discriminator": "conv",  # conv or mlp
         "learning_rate": 1e-3,  # for the internal optimizer
         "weight_decay": 0.0,

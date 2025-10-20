@@ -1,11 +1,6 @@
-"""Multi Layer Perceptron implemented to support custom 2nd order optimization routines."""
-
-import glog as log
 import copy
 import torch
 from torch import nn
-import torch.nn.functional as F
-import torch.distributions
 
 
 # Define model

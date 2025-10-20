@@ -42,14 +42,14 @@ def debug_model(
     pred_target = model(X_target)
     target_loss = loss_fun(pred_target, y_target)
     print(f"target_loss: {target_loss.item()}")
-    if config["calc_wrr"] == True:
+    if config["calc_wrr"]:
         source_loss = loss_fun(pred_source, y_source)
         ot_cost, ot_mat = calc_ot(pred_source, pred_target, fabric)
         wrr = source_loss + ot_cost
         print(
             f"WRR: {wrr.item()}, ot_cost: {ot_cost.item()}, source_loss: {source_loss.item()}"
         )
-    if config["calc_weighted_wrr"] == True:
+    if config["calc_weighted_wrr"]:
         w_wrr, w_ot_mat, w_source, w_source_loss = calc_weighted_wrr(
             model, fabric, loss_fun, pred_source, pred_target, y_source, reg=1e-1
         )
@@ -59,7 +59,7 @@ def debug_model(
         )
 
         # Get the top 5 weights
-        if config["verbose_weighted_wrr"] == True:
+        if config["verbose_weighted_wrr"]:
             vals, w_idx = torch.sort(w_source, descending=True)
             source_losses = loss_fun(pred_source, y_source, reduction="none")
             num_select = 5
@@ -85,7 +85,7 @@ def debug_model(
                 f"Num of predicted target class proportions in batch: {(torch.sum(y_preds_hot, dim=0) / num_target).detach().numpy()}"
             )
 
-    if config["calc_entanglement"] == True:
+    if config["calc_entanglement"]:
         y_dist = torch.cdist(y_source, y_target)
         entanglement = torch.sum(ot_mat * y_dist)
         print(f"Entanglement: {entanglement}")
@@ -121,14 +121,14 @@ def debug_model(
         filt_acc /= torch.sum(ot_mat[correct][filter_vec_margin])
         print(f"Margin filtered entanglement/acc: {filt_ent}/{filt_acc}")
 
-    if config["calc_margin"] == True:
+    if config["calc_margin"]:
         std_margin, avg_margin, _, _ = calc_margin(pred_source, y_source)
         print(f"Source margin mean: {avg_margin}, std: {std_margin}")
         std_margin, avg_margin, _, _ = calc_margin(pred_target, y_target)
         print(f"Target margin mean: {avg_margin}, std: {std_margin}")
-    if config["calc_grad_info"] == True:
+    if config["calc_grad_info"]:
         calc_grad_info(model, loss_fun, fabric, pred_source, pred_target, y_source)
-    if config["calc_weight_info"] == True:
+    if config["calc_weight_info"]:
         weight_norms = []
         for name, param in model.named_parameters():
             if "weight" in name:
@@ -136,7 +136,7 @@ def debug_model(
                     torch.linalg.vector_norm(param.data, ord=2, dim=None).item()
                 )
         print(f"Weight norms for each layer: {weight_norms}")
-    if config["calc_label_shift"] == True:
+    if config["calc_label_shift"]:
         calc_w_distance_label_shift(y_source, y_target, model.num_classes)
 
 

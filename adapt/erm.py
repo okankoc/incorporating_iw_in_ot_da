@@ -1,6 +1,3 @@
-import torch
-
-
 class ERM:
     def __init__(self, model, fabric, loss_fun, opt):
         self.name = "ERM"
