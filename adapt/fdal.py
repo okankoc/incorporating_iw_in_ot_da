@@ -17,11 +17,13 @@ class FDAL:
         taskhead = model.net[juncture:]
         if config["auxhead"] == "none":
             aux_head = None
-        elif config["auxhead"] == 'conv':
+        elif config["auxhead"] == "conv":
             aux_head = ConvDomainClassifier()
-            aux_head = init_lazy_discriminator(aux_head, backbone, scenario, use_features=False)
+            aux_head = init_lazy_discriminator(
+                aux_head, backbone, scenario, use_features=False
+            )
         else:
-            raise Exception('Unknown auxiliary head / domain classifier!')
+            raise Exception("Unknown auxiliary head / domain classifier!")
         self.clip_grad_val = config["clip_grad_val"]
         self.learner = fDALLearner(
             backbone,

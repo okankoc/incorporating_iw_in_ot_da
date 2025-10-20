@@ -222,7 +222,9 @@ def calc_weighted_wrr(model, fabric, loss_fun, f_source, f_target, y_source, reg
     # ot_mat = ot.sinkhorn_unbalanced(
     #     w_source, w_target, cost_mat, reg, reg_m, method="sinkhorn_stabilized"
     # )
-    ot_mat = ot.unbalanced.mm_unbalanced(w_source, w_target, cost_mat, reg_m, div='kl', numItermax=1000)
+    ot_mat = ot.unbalanced.mm_unbalanced(
+        w_source, w_target, cost_mat, reg_m, div="kl", numItermax=1000
+    )
 
     loss = torch.sum(ot_mat * cost_mat)
     w_source = torch.sum(ot_mat, dim=1)

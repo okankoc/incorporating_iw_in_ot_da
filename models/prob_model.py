@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import copy
 import load_model
 
+
 class ProbModel(nn.Module):
     # Take the last penultimate fc layer
     # Add another fc layer with double size, initialized partially from old parameters
@@ -39,7 +40,6 @@ class ProbModel(nn.Module):
             self.last_layer = model.fc
             self.num_classes = model.num_classes
 
-
     def make_prob_feat_resnet(self, resnet):
         dim = resnet.fc.in_features
         prob_layer = nn.Linear(dim, 2 * dim)
@@ -60,13 +60,13 @@ class ProbModel(nn.Module):
             resnet.layer4,
             resnet.avgpool,
             nn.Flatten(),
-            prob_layer)
-
+            prob_layer,
+        )
 
     def forward(self, input_data):
         out = self.net(input_data)
         mean = out[:, : self.num_features]
-        std = out[:, self.num_features:]
+        std = out[:, self.num_features :]
         normal_dist = torch.distributions.normal.Normal(mean, F.softplus(std))
         feat_dist = torch.distributions.Independent(
             base_distribution=normal_dist, reinterpreted_batch_ndims=1
@@ -76,11 +76,10 @@ class ProbModel(nn.Module):
         output = self.last_layer(sample)
         return output
 
-
     def forward_distr(self, input_data):
         out = self.net(input_data)
-        mean = out[:, :self.num_features]
-        std = out[:, self.num_features:]
+        mean = out[:, : self.num_features]
+        std = out[:, self.num_features :]
         normal_dist = torch.distributions.normal.Normal(mean, F.softplus(std))
         feat_dist = torch.distributions.Independent(
             base_distribution=normal_dist, reinterpreted_batch_ndims=1

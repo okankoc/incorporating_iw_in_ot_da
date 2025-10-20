@@ -43,7 +43,11 @@ def init_model(config, scenario):
     elif config["model"] == "SmallCNN":
         model = SmallCNN(num_classes=scenario.num_classes)
     elif config["model"] == "ResNet":
-        model = init_resnet(config["resnet_size"], scenario.num_channels, scenario.num_classes)
+        model = init_resnet(
+            config["resnet_size"], scenario.num_channels, scenario.num_classes
+        )
+    else:
+        raise Exception('Model not found')
     init_lazy_modules(model, scenario)
     disable_inplace_activations(model)
     print(f"Initialized model {model.name}")
@@ -100,22 +104,22 @@ def init_resnet(size, num_inp_channels, num_classes):
 
 
 def init_lazy_modules(model, scenario):
-    model = model.to('cpu')
+    model = model.to("cpu")
     for X_source, y_source in scenario.source_dataloader:
-        model(X_source.to('cpu'))
+        model(X_source.to("cpu"))
         break
     return model
 
 
 def init_lazy_discriminator(discr, model, scenario, use_features):
-    model = model.to('cpu')
-    discr = discr.to('cpu')
+    model = model.to("cpu")
+    discr = discr.to("cpu")
     for X_source, y_source in scenario.source_dataloader:
         if use_features is True:
-            model(X_source.to('cpu'))
+            model(X_source.to("cpu"))
             discr(model.features)
         else:
-            discr(model(X_source.to('cpu')))
+            discr(model(X_source.to("cpu")))
         break
     return discr
 

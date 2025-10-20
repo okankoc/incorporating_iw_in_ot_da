@@ -26,13 +26,17 @@ class ReverseLayerF(Function):
 class DANN(nn.Module):
     def __init__(self, config, fabric, model, loss_fun, scenario):
         super(DANN, self).__init__()
-        if config["discriminator"] == 'mlp':
+        if config["discriminator"] == "mlp":
             discr = MLP([100, 10, 2], nn.ReLU())
-        elif config["discriminator"] == 'conv':
+        elif config["discriminator"] == "conv":
             discr = ConvDomainClassifier()
         else:
             raise Exception("Unknown domain classifier!")
-        model.track_features(config["layer_to_apply_disc"])
+
+        if 'conv' in model.name:
+            model.track_features(config["conv_feat_layer"])
+        elif model.name == 'MLP':
+            model.track_features(config["mlp_feat_layer"])
         init_lazy_discriminator(discr, model, scenario, use_features=True)
         self.discriminator = discr
         self.model = model

@@ -1,4 +1,5 @@
 """Script for testing unsupervised domain adaptation algorithms in several different distribution shift scenarios."""
+
 import os
 import numpy as np
 import torch
@@ -8,9 +9,9 @@ from lightning import Fabric
 
 # Code from this repo
 import utils
-import shifts
 import adapt
 import loss
+import shifts
 from debug import debug_method
 from config.local_config import setup_local_config
 from config.cluster_config import setup_cluster_config
@@ -31,14 +32,64 @@ def reset_all(seed):
     torch.backends.cudnn.benchmark = False
 
 
+def init_scenario(config, fabric):
+    dataloader_options = {
+        "batch_size": config["batch_size"],
+        "shuffle": config["shuffle"],
+        "drop_last": False,
+    }
+    test_dataloader_options = {
+        "batch_size": config["test_batch_size"],
+        "shuffle": False,
+        "drop_last": False,
+    }
+    if config["scenario"] == "MNIST_TO_USPS":
+        scenario = shifts.mnist_to_usps.MNIST_to_USPS(
+            dataloader_options, test_dataloader_options
+        )
+    elif config["scenario"] == "USPS_TO_MNIST":
+        scenario = shifts.usps_to_mnist.USPS_to_MNIST(
+            dataloader_options, test_dataloader_options
+        )
+    elif config["scenario"] == "MNIST_TO_MNIST_M":
+        scenario = shifts.mnist_to_mnist_m.MNIST_to_MNIST_M(
+            dataloader_options, test_dataloader_options, preprocess=False
+        )
+    elif config["scenario"] == "SVHN_TO_MNIST":
+        scenario = shifts.svhn_to_mnist.SVHN_to_MNIST(
+            dataloader_options, test_dataloader_options
+        )
+    elif config["scenario"] == "CIFAR-10-C":
+        scenario = shifts.cifar_corrupt.CIFAR_CORRUPT(
+            dataloader_options,
+            test_dataloader_options,
+            corruptions=config["cifar-10-corruptions"],
+        )
+    elif config["scenario"] == "PORTRAITS":
+        scenario = shifts.portraits.PORTRAITS(
+            dataloader_options, test_dataloader_options, size=(32, 32), train_ratio=0.8
+        )
+    elif config["scenario"] == "OFFICEHOME":
+        scenario = shifts.office_home.OFFICEHOME(
+            dataloader_options, test_dataloader_options, size=(224, 224)
+        )
+    else:
+        raise Exception("Unknown scenario")
+    return scenario
+
+
 def init_algorithm(config, name, model, loss_fun, opt, scenario, fabric):
     # Prepare adaptation methods
     if name == "wrr":
         alg = adapt.wrr.WRR(config["wrr"], fabric, model, loss_fun, opt)
     elif name == "weighted_wrr":
-        alg = adapt.weighted_wrr.WeightedWRR(config["weighted_wrr"], fabric, model, loss_fun, opt)
+        alg = adapt.weighted_wrr.WeightedWRR(
+            config["weighted_wrr"], fabric, model, loss_fun, opt
+        )
     elif name == "cons_wrr":
-        alg = adapt.constrained_wrr.ConstrainedWRR(config["cons_wrr"], fabric, model, loss_fun, opt)
+        alg = adapt.constrained_wrr.ConstrainedWRR(
+            config["cons_wrr"], fabric, model, loss_fun, opt
+        )
     elif name == "lje":
         alg = adapt.oracle.OracleLJE(fabric, model, loss_fun, opt)
     elif name == "cc":
@@ -51,9 +102,11 @@ def init_algorithm(config, name, model, loss_fun, opt, scenario, fabric):
         alg = adapt.fdal.FDAL(config["fdal"], fabric, model, loss_fun, scenario)
     elif name == "reverse_kl":
         model = ProbModel(model)
-        alg = adapt.reverse_kl.ReverseKL(config["reverse_kl"], fabric, model, loss_fun, opt)
+        alg = adapt.reverse_kl.ReverseKL(
+            config["reverse_kl"], fabric, model, loss_fun, opt
+        )
     else:
-        raise Exception('UDA method not found!')
+        raise Exception("UDA method not found!")
     return alg, model
 
 
@@ -62,11 +115,10 @@ def run_uda(config, fabric):
     num_methods = len(methods)
     num_epochs = config["num_epochs"]
     num_runs = config["num_runs"]
-    results = torch.zeros(
-        num_methods, num_runs, num_epochs+1, 4)
+    results = torch.zeros(num_methods, num_runs, num_epochs + 1, 4)
 
     # Run adaptation
-    scenario = shifts.init_scenario(config, fabric)
+    scenario = init_scenario(config["scenario_options"], fabric)
     model = init_model(config, scenario)
     scenario = setup_fabric_dataloaders(fabric, scenario)
     loss_fun = init_loss(config)
@@ -80,22 +132,25 @@ def run_uda(config, fabric):
             model = load_model(config, fabric, scenario)
             loss_fun = init_loss(config)
             opt = init_opt(config, model)
-            alg, model = init_algorithm(config, methods[i], model, loss_fun, opt, scenario, fabric)
+            alg, model = init_algorithm(
+                config, methods[i], model, loss_fun, opt, scenario, fabric
+            )
             print("===============================")
             print(f"Algorithm {alg.name}, run number: {j}")
             for epoch in range(num_epochs):
                 batch_idx = 0
                 print(f"Epoch {epoch+1}")
-                print(f"Number of batches: {len(scenario.source_dataloader)}")
+                # print(f"Number of batches: {len(scenario.source_dataloader)}")
                 for (X_train, y_train), (X_shift, y_shift) in zip(
                     scenario.source_dataloader, scenario.target_dataloader
                 ):
                     y_train = utils.one_hot(y_train, scenario.num_classes)
                     y_shift = utils.one_hot(y_shift, scenario.num_classes)
-                    print(f"Batch id: {batch_idx}")
+                    if batch_idx % 10 == 0:
+                        print(f"Batch id: {batch_idx}")
                     alg.adapt(model, fabric, X_train, y_train, X_shift, y_shift)
                     if config["debug"] is True and (
-                        batch_idx % config["print_every_n"] == 0
+                        batch_idx % config["debug_every_n"] == 0
                     ):
                         debug_method(
                             config,
@@ -104,16 +159,19 @@ def run_uda(config, fabric):
                             loss_fun,
                             scenario,
                             fabric,
-                            batch_idx / config["print_every_n"],
+                            batch_idx / config["debug_every_n"],
                         )
                     batch_idx += 1
-                    if config['n_batches_per_epoch'] != -1 and batch_idx % config['n_batches_per_epoch'] == 0:
-                        print('Terminating epoch early for debugging purposes...')
+                    if (
+                        config["n_batches_per_epoch"] != -1
+                        and batch_idx % config["n_batches_per_epoch"] == 0
+                    ):
+                        print("Terminating epoch early for debugging purposes...")
                         break
 
                 print("===============================")
                 print(f"Algorithm {alg.name}")
-                results[i, j, epoch+1, :] = utils.report_metrics(
+                results[i, j, epoch + 1, :] = utils.report_metrics(
                     scenario,
                     model,
                     loss_fun,
@@ -169,15 +227,15 @@ def setup_fabric_dataloaders(fabric, scenario):
 
 
 def save_results(results, config):
-    scenario_name = config["scenario"]
+    scenario_name = config["scenario_options"]["scenario"]
     model_name = config["model"]
-    folder_name = os.path.join('results', scenario_name, model_name)
+    folder_name = os.path.join("results", scenario_name, model_name)
     os.makedirs(folder_name, exist_ok=True)
     methods = config["algs"]
     num_methods, num_runs, num_epochs, _ = results.shape
     metrics = ["loss_source", "acc_source", "loss_target", "acc_target"]
 
-    data = {'config': config}
+    data = {"config": config}
     for m, metric in enumerate(metrics):
         data[metric] = {}
         save_name = metric
@@ -201,21 +259,20 @@ def run_on_cluster():
 
     if fabric.global_rank != 0:
         import builtins
+
         builtins.print = lambda *args, **kwargs: None
 
     print(f"Fabric device: {fabric.device}")
     reset_all(seed=0)
 
     # Run all experiments
-    dann_layers = [-2, "flatten", -1] # ignored for ResNet
     for i, model in enumerate(config["models"]):
         if model == "ResNet":
             config["optimizer"] = "sgd"
             config["learning_rate"] = 1e-4
-        for scenario in config["scenarios"]:
+        for scenario in config["scenario_options"]["scenarios"]:
             config["model"] = model
-            config["scenario"] = scenario
-            config["dann"]["layer_to_apply_disc"] = dann_layers[i]
+            config["scenario_options"]["scenario"] = scenario
             res = run_uda(config, fabric)
             save_results(res, config)
 
@@ -237,12 +294,11 @@ def run_on_local():
     save_results(res, config)
 
 
-
 if __name__ == "__main__":
     torch.set_default_dtype(torch.float32)
     # torch.set_printoptions(precision=3, sci_mode=False)
     # torch.autograd.set_detect_anomaly(True)
     # os.environ["TORCH_SHOW_CPP_STACKTRACES"] = "1"
 
-    run_on_local()
-    # run_on_cluster()
+    # run_on_local()
+    run_on_cluster()

@@ -8,7 +8,7 @@ class ReverseKL:
         super(ReverseKL, self).__init__()
         self.loss_fun = copy.deepcopy(loss_fun)
         model, self.opt = fabric.setup(model, opt)
-        model.mark_forward_method('forward_distr')
+        model.mark_forward_method("forward_distr")
         self.name = "Reverse-KL"
         self.alpha_reverse = config[
             "alpha_reverse"

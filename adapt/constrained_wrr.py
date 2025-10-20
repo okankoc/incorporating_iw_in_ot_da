@@ -50,5 +50,4 @@ class ConstrainedWRR:
             print("Constraint threshold exceeded. Minimizing constraint")
         else:
             self.mode = 1  # minimize scaled WRR
-            print(
-                "Constraint threshold satisfied. Minimizing WRR.")
+            print("Constraint threshold satisfied. Minimizing WRR.")

@@ -12,29 +12,32 @@ def setup_local_config():
         "learning_rate": 1e-3,  # use 1e-4 for ResNets or a learning scheduler
         "momentum": 0.9,  # for SGD
         "weight_decay": 0.0,
-        # Data loader options
-        "batch_size": 64,
-        # Distribution shift scenario (MNIST_TO_USPS, CIFAR10C, ...)
-        "scenario": "MNIST_TO_USPS",
-        "cifar-10-corruptions": ["fog", "frost", "snow"],
         "num_epochs": 1,
         "num_runs": 1,
         "algs": [
             "wrr",
         ],  # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
         # Debugging algorithms
-
         "debug": True,
-        "print_every_n": 50,
-        "n_batches_per_epoch": 200, # if -1 uses all batches
+        "debug_every_n": 50,
+        "n_batches_per_epoch": -1,  # if -1 uses all batches
         "report_source_train_risk": False,
         "report_target_train_risk": False,
         "pretrain_on_both": False,  # starting from a model that 'cheats'!
         "adapt_only_last_layer": False,
-        # Test set dataloader options
-        "test_batch_size": 512,
         "checkpoint": False,
         "validate": True,
+    }
+
+    scenario_config = {
+        # Data loader options
+        "batch_size": 64,
+        # Test set dataloader options
+        "test_batch_size": 512,
+        "shuffle": True,
+        "cifar-10-corruptions": ["fog", "frost", "snow"],
+        # Distribution shift scenario (MNIST_TO_USPS, CIFAR10C, ...)
+        "scenario": "MNIST_TO_USPS",
     }
 
     debug_config = {
@@ -48,6 +51,7 @@ def setup_local_config():
         "calc_grad_info": False,
     }
 
+    config["scenario_options"] = scenario_config
     config["debug_options"] = debug_config
 
     # Algorithms and their hyperparameters/options
@@ -66,7 +70,7 @@ def setup_alg_config(config):
 
     weighted_wrr_config = {
         "scale": 1.0,
-        "entropy_reg": 1e-1, # only for sinkhorn uot
+        "entropy_reg": 1e-1,  # only for sinkhorn uot
         "add_source_loss": True,
         "separate_optim": True,
         "uot_alg": "mm",  # sinkhorn or mm
@@ -80,8 +84,9 @@ def setup_alg_config(config):
     cons_wrr_config = {"norm": 2, "entropy_reg": 1e-3, "scale": 1.0, "thresh": 0.01}
 
     dann_config = {
-        "layer_to_apply_disc": -2,  #'flatten' for Conv or -2 for MLP, ignored for ResNets (always input to fc layer is taken)!
-        "discriminator": "conv", # conv or mlp
+        "conv_feat_layer": "flatten",
+        "mlp_feat_layer": -2, # ignored for ResNets
+        "discriminator": "conv",  # conv or mlp
         "learning_rate": 1e-3,  # for the internal optimizer
         "weight_decay": 0.0,
         "num_epochs": 2,

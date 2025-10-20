@@ -38,9 +38,9 @@ def test(dataloader, model, loss_fun, fabric):
             )
             correct += (pred.argmax(1) == y).sum()
             num_points += y.size(0)
-    num_points = fabric.all_reduce(num_points, reduce_op='sum')
-    test_loss = fabric.all_reduce(test_loss, reduce_op='sum') / num_points
-    correct = fabric.all_reduce(correct, reduce_op='sum') / num_points
+    num_points = fabric.all_reduce(num_points, reduce_op="sum")
+    test_loss = fabric.all_reduce(test_loss, reduce_op="sum") / num_points
+    correct = fabric.all_reduce(correct, reduce_op="sum") / num_points
     print(f"Accuracy: {(100*correct):0.2f}%, Avg loss: {test_loss:.6f} \n")
     return test_loss, correct
 
@@ -148,3 +148,20 @@ def train(
             print("Train dataset metrics:")
             test(dataloader, model, loss_fun, fabric)
     print(f"Method took {time.perf_counter() - t0} sec")
+
+
+# Assuming Euclidean distance is to be used for W_{1,l} computation,
+# the result is equal to \sqrt(2) / 2 * \sum_i |p_i - q_i|
+def calc_w_distance_label_shift(scenario):
+    num_cond_source = torch.zeros(scenario.num_classes)
+    num_cond_target = torch.zeros(scenario.num_classes)
+    for (X_train, y_train), (X_shift, y_shift) in zip(
+        scenario.source_dataloader, scenario.target_dataloader
+    ):
+        for i in range(scenario.num_classes):
+            num_cond_source[i] += torch.sum(y_train == i)
+            num_cond_target[i] += torch.sum(y_shift == i)
+    p_y = num_cond_source / torch.sum(num_cond_source)
+    q_y = num_cond_target / torch.sum(num_cond_target)
+    w_1_euclidean_dist = np.sqrt(2) * torch.sum(torch.abs(p_y - q_y)) / 2
+    print(f"W1_distance_labels for {scenario.name} is {w_1_euclidean_dist}")
