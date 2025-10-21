@@ -109,22 +109,45 @@ def init_algorithm(config, name, model, loss_fun, opt, scenario, fabric):
     return alg, model
 
 
-def run_uda(config, fabric):
+def report_init_performance(config, model, scenario, loss_fun, fabric):
     methods = config["algs"]
     num_methods = len(methods)
     num_epochs = config["num_epochs"]
     num_runs = config["num_runs"]
     results = torch.zeros(num_methods, num_runs, num_epochs + 1, 4)
+    # reporting loss_source, acc_source, loss_target, acc_target
+    res_pretrain = utils.report_metrics(
+        scenario,
+        model,
+        loss_fun,
+        config["report_source_train_risk"],
+        config["report_target_train_risk"],
+        fabric,
+    )
+    for i in range(num_methods):
+        for j in range(num_runs):
+            results[i, j, 0, :] = res_pretrain
+    return results
+
+
+def run_uda(config, fabric):
+    methods = config["algs"]
+    num_methods = len(methods)
+    num_epochs = config["num_epochs"]
+    num_runs = config["num_runs"]
 
     # Run adaptation
     scenario = init_scenario(config["scenario_options"], fabric)
     model = init_model(config, scenario)
     scenario = setup_fabric_dataloaders(fabric, scenario)
     loss_fun = init_loss(config)
-    opt = init_opt(config, model)
-    results = pretrain_model(model, config, fabric, scenario, loss_fun, opt, results)
+    if config['pretrain']:
+        opt = init_opt(config, model)
+        pretrain_model(model, config, fabric, scenario, loss_fun, opt)
+    else:
+        model = fabric.setup(model)
+    results = report_init_performance(config, model, scenario, loss_fun, fabric)
 
-    # saving loss_source, acc_source, loss_target, acc_target
     for i in range(num_methods):
         for j in range(num_runs):
             reset_all(seed=j)

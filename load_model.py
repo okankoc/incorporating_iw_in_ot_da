@@ -13,12 +13,13 @@ def load_model(config, fabric, scenario):
     model = init_model(config, scenario)
     folder_path = "save_files/" + scenario.name + "/"
     save_path = folder_path + model.name + ".pth"
-    try:
-        # Load parameters from a file
-        model.load_state_dict(torch.load(save_path, weights_only=True))
-        print(f"Saved model found! Loading parameters from file: {save_path}")
-    except:
-        print(f"Saved model {model.name} NOT found!")
+    if config['pretrain']:
+        try:
+            # Load parameters from a file
+            model.load_state_dict(torch.load(save_path, weights_only=True))
+            print(f"Saved model found! Loading parameters from file: {save_path}")
+        except:
+            print(f"Saved model {model.name} NOT found!")
     model.train()
     if config["adapt_only_last_layer"]:
         num_layers = len(list(model.parameters()))
@@ -49,16 +50,8 @@ def init_model(config, scenario):
     else:
         raise Exception("Model not found")
     init_lazy_modules(model, scenario)
-    disable_inplace_activations(model)
     print(f"Initialized model {model.name}")
     return model
-
-
-def disable_inplace_activations(model):
-    for m in model.modules():
-        if isinstance(m, (nn.ReLU, nn.LeakyReLU, nn.GELU, nn.SiLU)):
-            if hasattr(m, "inplace") and m.inplace:
-                m.inplace = False
 
 
 def init_resnet(size, num_inp_channels, num_classes):
@@ -130,35 +123,20 @@ def pretrain_model(model, config, fabric, scenario, loss_fun, opt, res):
     try:
         # Load parameters from a file
         model.load_state_dict(torch.load(save_path, weights_only=True))
-        print(f"Saved model found! Loading parameters from file: {save_path}")
+        print(f"Saved model found! Loaded parameters from file: {save_path}")
         model = fabric.setup(model)
     except:
         print(f"Saved model {model.name} NOT found!")
-        if config["pretrain"] is True:
-            model, opt = fabric.setup(model, opt)
-            print(f"Pretraining {config['num_pretrain_epochs']} epochs...")
-            if config["pretrain_on_both"] is True:
-                print(
-                    "========= DEBUG MODE ON: USING TARGET LABELS TO PRETRAIN LJE ORACLE MODEL ======="
-                )
-                model = utils.train_model_on_source_and_target(
-                    config, model, loss_fun, scenario, opt, fabric
-                )
-            else:
-                model = utils.train_model_on_source(
-                    config, model, loss_fun, scenario, opt, fabric
-                )
-
-    # Report initial performance
-    res_pretrain = utils.report_metrics(
-        scenario,
-        model,
-        loss_fun,
-        config["report_source_train_risk"],
-        config["report_target_train_risk"],
-        fabric,
-    )
-    for i in range(res.shape[0]):
-        for j in range(res.shape[1]):
-            res[i, j, 0, :] = res_pretrain
-    return res
+        model, opt = fabric.setup(model, opt)
+        print(f"Pretraining {config['num_pretrain_epochs']} epochs...")
+        if config["pretrain_on_both"] is True:
+            print(
+                "========= DEBUG MODE ON: USING TARGET LABELS TO PRETRAIN LJE ORACLE MODEL ======="
+            )
+            model = utils.train_model_on_source_and_target(
+                config, model, loss_fun, scenario, opt, fabric
+            )
+        else:
+            model = utils.train_model_on_source(
+                config, model, loss_fun, scenario, opt, fabric
+            )
