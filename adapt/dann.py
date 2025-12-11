@@ -36,10 +36,10 @@ class DANN(nn.Module):
             model.track_features(config["conv_feat_layer"])
         elif model.name == "MLP":
             model.track_features(config["mlp_feat_layer"])
-        elif 'RESNET' in model.name:
+        elif "RESNET" in model.name:
             model.track_features(-1)
         else:
-            raise Exception('Model not found!')
+            raise Exception("Model not found!")
         init_lazy_discriminator(discr, model, scenario, use_features=True)
         self.discriminator = discr
         self.model = model

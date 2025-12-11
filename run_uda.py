@@ -141,7 +141,7 @@ def run_uda(config, fabric):
     model = init_model(config, scenario)
     scenario = setup_fabric_dataloaders(fabric, scenario)
     loss_fun = init_loss(config)
-    if config['pretrain']:
+    if config["pretrain"]:
         opt = init_opt(config, model)
         pretrain_model(model, config, fabric, scenario, loss_fun, opt)
     else:

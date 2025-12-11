@@ -13,7 +13,7 @@ def load_model(config, fabric, scenario):
     model = init_model(config, scenario)
     folder_path = "save_files/" + scenario.name + "/"
     save_path = folder_path + model.name + ".pth"
-    if config['pretrain']:
+    if config["pretrain"]:
         try:
             # Load parameters from a file
             model.load_state_dict(torch.load(save_path, weights_only=True))

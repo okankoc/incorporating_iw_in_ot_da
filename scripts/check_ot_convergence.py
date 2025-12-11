@@ -24,15 +24,19 @@ from models.mlp import MultiLayerPerceptron as MLP
 from sinkhorn_uot import fast_uot_sinkhorn, mm_unbalanced
 
 
+def calc_emd(f_source, f_target, p):
+    num_source = f_source.shape[0]
+    num_target = f_target.shape[0]
+    w_source = torch.ones(num_source) / num_source
+    w_target = torch.ones(num_target) / num_target
+    cost_mat = torch.cdist(f_source, f_target, p) ** 2
+    ot_mat = ot.emd(w_source, w_target, cost_mat, numItermax=100000)
+    return torch.sqrt(torch.sum(ot_mat * cost_mat))
+
+
 def calc_ot(f_source, f_target, method, reg=1e-6, p=2):
     if method == "emd":
-        num_source = f_source.shape[0]
-        num_target = f_target.shape[0]
-        w_source = torch.ones(num_source) / num_source
-        w_target = torch.ones(num_target) / num_target
-        cost_mat = torch.cdist(f_source, f_target, p=2) ** 2
-        ot_mat = ot.emd(w_source, w_target, cost_mat, numItermax=100000)
-        return torch.sqrt(torch.sum(ot_mat * cost_mat))
+        return calc_emd(f_source, f_target, p)
     elif method == "sinkhorn_log":
         num_source = f_source.shape[0]
         num_target = f_target.shape[0]
@@ -45,12 +49,32 @@ def calc_ot(f_source, f_target, method, reg=1e-6, p=2):
         return torch.sqrt(torch.sum(ot_mat * cost_mat))
     elif method == "sinkhorn":
         # print(f"Computing OT with geomloss using {method} method")
-        ot_loss = geomloss.SamplesLoss(loss=method, p=p, blur=reg, debias=True)
+        ot_loss = geomloss.SamplesLoss(loss="sinkhorn", p=p, blur=reg, debias=True)
         return ot_loss(f_source, f_target)
     elif method == "sliced":
         return ot.sliced_wasserstein_distance(
             f_source, f_target, p=2, n_projections=1000
         )
+    elif method == "debias_ot":
+        num_source = f_source.shape[0]
+        num_target = f_target.shape[0]
+        n_s = int(num_source / 2)
+        n_t = int(num_target / 2)
+        f_s1 = f_source[:n_s]
+        f_s2 = f_source[n_s:]
+        f_t1 = f_target[:n_t]
+        f_t2 = f_target[n_t:]
+        # ot_loss = geomloss.SamplesLoss(loss="sinkhorn", p=p, blur=reg, debias=False)
+        # return (ot_loss(f_s1, f_t1) + ot_loss(f_s2, f_t1) + ot_loss(f_s1, f_t2) + ot_loss(f_s2, f_t2) - 2*ot_loss(f_s1, f_s2) - 2*ot_loss(f_t1, f_t2))/2
+        # return 2*calc_emd(f_source, f_target, p) - calc_emd(f_s1, f_s2, p) - calc_emd(f_t1, f_t2, p)
+        return (
+            calc_emd(f_s1, f_t1, p)
+            + calc_emd(f_s2, f_t1, p)
+            + calc_emd(f_s1, f_t2, p)
+            + calc_emd(f_s2, f_t2, p)
+            - 2 * calc_emd(f_s1, f_s2, p)
+            - 2 * calc_emd(f_t1, f_t2, p)
+        ) / 2
     else:
         print("Solver not found!")
         return 0.0
@@ -90,8 +114,8 @@ def plot_stats(
         y=anal_dist.detach().numpy(), color="r", linestyle="--", label="Analytical"
     )
     plt.xlabel("Number of Samples")
-    plt.ylabel("Mean W2-Dist")
-    plt.title("Conv of Mean W2-Dist with Increasing Samples")
+    plt.ylabel("W2-Dist")
+    plt.title("W2-Dist")
     plt.legend()
     plt.grid(True)
 
@@ -106,8 +130,8 @@ def plot_stats(
         label=method,
     )
     plt.xlabel("Number of Samples")
-    plt.ylabel("Mean W2-Dist Grad Norm Diff")
-    plt.title("Conv. of Mean W2-Dist Grad Norm Error with Increasing Samples")
+    plt.ylabel("W2-Dist Grad Norm Diff")
+    plt.title("W2-Dist Grad Norm Error")
     plt.legend()
     plt.grid(True)
 
@@ -124,8 +148,8 @@ def plot_stats(
         label=method,
     )
     plt.xlabel("Number of Samples")
-    plt.ylabel("Mean W2-Dist Grad Angle Diff")
-    plt.title("Conv. of Mean W2-Dist Grad Angle Error with Increasing Samples")
+    plt.ylabel("W2-Dist Grad Angle Diff")
+    plt.title("W2-Dist Grad Angle Error")
     plt.legend()
     plt.grid(True)
 
@@ -145,9 +169,11 @@ def reset_all(seed):
 
 def check_gaussians():
     in_dim, out_dim = 10, 10
+    seed = 5
+    reset_all(seed)
     model = MLP(layer_sizes=[in_dim, out_dim], f_nonlinear=[])
 
-    method = "sliced"  # emd, sinkhorn, sliced, sinkhorn_log
+    method = "emd"  # emd, sinkhorn, sliced, sinkhorn_log
     num_trials = 10
     num_batches = 20
     batch_sizes = torch.arange(start=100, end=1100, step=100, dtype=torch.int)
@@ -161,7 +187,8 @@ def check_gaussians():
             "shuffle": False,
             "drop_last": True,
         }
-        reset_all(seed=1)
+        reset_all(seed)
+        model.zero_grad()
         scenario = synthetic_shifts.RandomGaussians(
             dim=in_dim, num_batches=num_batches, dataloader_options=dl_options
         )
@@ -428,11 +455,11 @@ def compare_gromov_wasserstein_to_ot():
 
 
 if __name__ == "__main__":
-    logging.getLogger("torch._dynamo").setLevel(logging.ERROR)
-    logging.getLogger("torch._inductor").setLevel(logging.ERROR)
+    # logging.getLogger("torch._dynamo").setLevel(logging.ERROR)
+    # logging.getLogger("torch._inductor").setLevel(logging.ERROR)
 
     # compare_gromov_wasserstein_to_ot()
-    run_uot_solvers()
+    # run_uot_solvers()
     # compare_ot_solvers()
-    # check_gaussians()
+    check_gaussians()
     # check_mnist_to_usps()
