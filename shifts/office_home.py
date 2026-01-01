@@ -4,13 +4,13 @@ from torchvision import datasets
 from torchvision.transforms import v2
 
 
-# For now the scenario we consider: training on Art, Clipart, Product -> testing on Real World
 class OFFICEHOME:
     def __init__(
         self,
         dataloader_options,
         test_dataloader_options,
-        size=(32, 32),
+        target_name,
+        size,
         train_ratio=0.8,
         grayscale=False,
     ):
@@ -26,18 +26,25 @@ class OFFICEHOME:
         if grayscale is True:
             operations.append(v2.Grayscale(1))
         transforms = v2.Compose(operations)
-        # art_data = datasets.ImageFolder(root='data/OfficeHomeDataset/Art', transform=transforms)
-        # clipart_data = datasets.ImageFolder(root='data/OfficeHomeDataset/Clipart', transform=transforms)
-        product_data = datasets.ImageFolder(
+
+        data = {}
+        data['art'] = datasets.ImageFolder(root='data/OfficeHomeDataset/Art', transform=transforms)
+        data['clipart'] = datasets.ImageFolder(root='data/OfficeHomeDataset/Clipart', transform=transforms)
+        data['product'] = datasets.ImageFolder(
             root="data/OfficeHomeDataset/Product", transform=transforms
         )
-        real_data = datasets.ImageFolder(
+        data['real world'] = datasets.ImageFolder(
             root="data/OfficeHomeDataset/Real World", transform=transforms
         )
 
-        # source_data = ConcatDataset([art_data, clipart_data, product_data])
-        source_data = product_data
-        target_data = real_data
+        target_data = data[target_name]
+        source_data = []
+        source_name = ''
+        for name, dataset in data.items():
+            if name != target_name:
+                source_data.append(dataset)
+                source_name += name + '_'
+        source_data = torch.utils.data.ConcatDataset(source_data)
 
         train_size = int(train_ratio * len(source_data))
         test_size = int(len(source_data)) - train_size
@@ -53,5 +60,5 @@ class OFFICEHOME:
         self.source_test_dataloader = DataLoader(test_source, **test_dataloader_options)
         self.target_test_dataloader = DataLoader(test_target, **test_dataloader_options)
 
-        self.source_name = "product"
-        self.target_name = "real"
+        self.source_name = source_name
+        self.target_name = target_name

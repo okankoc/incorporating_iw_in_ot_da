@@ -117,7 +117,7 @@ def init_lazy_discriminator(discr, model, scenario, use_features):
     return discr
 
 
-def pretrain_model(model, config, fabric, scenario, loss_fun, opt, res):
+def pretrain_model(model, config, fabric, scenario, loss_fun, opt):
     folder_path = "save_files/" + scenario.name + "/"
     save_path = folder_path + model.name + ".pth"
     try:

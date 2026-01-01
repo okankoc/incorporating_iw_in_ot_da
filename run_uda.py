@@ -70,7 +70,7 @@ def init_scenario(config, fabric):
                                               grayscale=config['portraits-grayscale'], train_ratio=0.8)
     elif config["scenario"] == "OFFICEHOME":
         scenario = shifts.office_home.OFFICEHOME(
-            dataloader_options, test_dataloader_options, size=(224, 224)
+            dataloader_options, test_dataloader_options, target_name=config['officehome-target'], size=(224, 224)
         )
     else:
         raise Exception("Unknown scenario")
@@ -321,5 +321,5 @@ if __name__ == "__main__":
     # torch.autograd.set_detect_anomaly(True)
     # os.environ["TORCH_SHOW_CPP_STACKTRACES"] = "1"
 
-    # run_on_local()
-    run_on_cluster()
+    run_on_local()
+    # run_on_cluster()

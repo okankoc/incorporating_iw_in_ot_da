@@ -38,7 +38,10 @@ def setup_cluster_config():
         "cifar-10-corruptions": ["fog", "frost", "snow"],
         "portraits-size": [186, 171],
         "portraits-grayscale": False,
-        # Distribution shift scenario (MNIST_TO_USPS, CIFAR10C, ...)
+        "officehome-target": "real world", # 'art', 'clipart', 'product', 'real world'
+        # Distribution shift scenario
+        # MNIST_TO_USPS, USPS_TO_MNIST, MNIST_TO_MNIST_M, SVHN_TO_MNIST,
+        # CIFAR-10-C, PORTRAITS, OFFICEHOME,
         "scenarios": [
             "CIFAR-10-C",
         ],

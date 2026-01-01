@@ -3,19 +3,19 @@ def setup_local_config():
         # Experiment details
         "device": "cpu",  # 'cpu' or 'auto' to find gpu automatically
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        "model": "MLP",
+        "model": "ResNet",
         "resnet_size": 18,  # 18 or 50
         "pretrain": True,
         "num_pretrain_epochs": 3,  # if pretrain is True
         "loss": "margin",  # 'margin', 'euclidean', 'cross-entropy'
         "optimizer": "adam",  # alternatives: adam, sgd
-        "learning_rate": 1e-3,  # use 1e-4 for ResNets or a learning scheduler
+        "learning_rate": 1e-4,  # use 1e-4 for ResNets or a learning scheduler
         "momentum": 0.9,  # for SGD
         "weight_decay": 0.0,
         "num_epochs": 1,
         "num_runs": 1,
         "algs": [
-            "wrr",
+            "lje",
         ],  # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
         # Debugging algorithms
         "debug": True,
@@ -36,8 +36,13 @@ def setup_local_config():
         "test_batch_size": 512,
         "shuffle": True,
         "cifar-10-corruptions": ["fog", "frost", "snow"],
-        # Distribution shift scenario (MNIST_TO_USPS, CIFAR10C, ...)
-        "scenario": "MNIST_TO_USPS",
+        "portraits-size": [186, 171],
+        "portraits-grayscale": False,
+        "officehome-target": "real world", # 'art', 'clipart', 'product', 'real world'
+        # Distribution shift scenario
+        # MNIST_TO_USPS, USPS_TO_MNIST, MNIST_TO_MNIST_M, SVHN_TO_MNIST,
+        # CIFAR-10-C, PORTRAITS, OFFICEHOME,
+        "scenario": "OFFICEHOME",
     }
 
     debug_config = {
