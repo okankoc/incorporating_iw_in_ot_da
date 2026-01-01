@@ -3,20 +3,19 @@ def setup_cluster_config():
         # Experiment details
         "device": "auto",  # 'cpu' or 'auto' to find gpu automatically
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        "models": ["ConvNet"],
-        "resnet_size": 18,  # 18 or 50
+        "models": ["ConvNet2", "ResNet"],
+        "resnet_size": 50,  # 18 or 50
         "pretrain": False,
         "num_pretrain_epochs": 5,  # if pretrain is True
-        "loss": "margin",  # margin, euclidean or cross-entropy
+        "loss": "euclidean",  # margin, euclidean or cross-entropy
         "optimizer": "adam",  # alternatives: adam, sgd
         "learning_rate": 1e-3,  # use 1e-4 for ResNets or a learning scheduler
         "momentum": 0.9,  # for SGD
         "weight_decay": 0.0,
-        "num_epochs": 1,
+        "num_epochs": 5,
         "num_runs": 1,
         "algs": [
-            "lje",
-            "cc",
+            "erm",
         ],  # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
         # Debugging algorithms
         "debug": False,
@@ -37,9 +36,11 @@ def setup_cluster_config():
         "test_batch_size": 512,
         "shuffle": True,
         "cifar-10-corruptions": ["fog", "frost", "snow"],
+        "portraits-size": [186, 171],
+        "portraits-grayscale": False,
         # Distribution shift scenario (MNIST_TO_USPS, CIFAR10C, ...)
         "scenarios": [
-            "SVHN_TO_MNIST",
+            "CIFAR-10-C",
         ],
     }
 

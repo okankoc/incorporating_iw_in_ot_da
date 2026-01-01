@@ -65,9 +65,9 @@ def init_scenario(config, fabric):
             corruptions=config["cifar-10-corruptions"],
         )
     elif config["scenario"] == "PORTRAITS":
-        scenario = shifts.portraits.PORTRAITS(
-            dataloader_options, test_dataloader_options, size=(32, 32), train_ratio=0.8
-        )
+        scenario = shifts.portraits.PORTRAITS(dataloader_options,
+                                              test_dataloader_options, size=config['portraits-size'],
+                                              grayscale=config['portraits-grayscale'], train_ratio=0.8)
     elif config["scenario"] == "OFFICEHOME":
         scenario = shifts.office_home.OFFICEHOME(
             dataloader_options, test_dataloader_options, size=(224, 224)

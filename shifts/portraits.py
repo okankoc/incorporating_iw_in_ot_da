@@ -7,19 +7,16 @@ from torchvision.transforms import v2
 
 
 class PORTRAITS:
-    def __init__(self, dl_options, test_dl_options, size=(32, 32), train_ratio=0.8):
+    def __init__(self, dl_options, test_dl_options, size, grayscale, train_ratio=0.8):
         self.name = "PORTRAITS"
-        self.num_channels = 1
         self.num_classes = 2
         self.input_size = size[0] * size[1]
-        transforms = v2.Compose(
-            [
-                v2.ToImage(),
-                v2.ToDtype(torch.float32, scale=True),
-                v2.Grayscale(1),
-                v2.Resize(size),
-            ]
-        )
+        transforms = [v2.ToImage(), v2.ToDtype(torch.float32, scale=True), v2.Resize(size)]
+        self.num_channels = 3
+        if grayscale is True:
+            self.num_channels = 1
+            transforms.append(v2.Grayscale(1))
+        transforms = v2.Compose(transforms)
         dataset = ImageFolderWithFilenames(root="data/Portraits", transform=transforms)
 
         # Print first year of dataset
