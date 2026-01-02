@@ -8,3 +8,4 @@ from .usps_to_mnist import USPS_to_MNIST
 from .upsample import upsample_dataset
 from .office_31 import OFFICE31
 from .image_clef import IMAGECLEFDA
+from .vis_da17 import VisDA17

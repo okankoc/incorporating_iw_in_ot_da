@@ -80,6 +80,10 @@ def init_scenario(config, fabric):
         scenario = shifts.image_clef.IMAGECLEFDA(
             dataloader_options, test_dataloader_options, preprocess=config['preprocess'], target_name=config['imageclef-target'], size=config['imageclef-size']
         )
+    elif config["scenario"] == "VISDA17":
+        scenario = shifts.vis_da17.VisDA17(
+            dataloader_options, test_dataloader_options, size=config['visda17-size']
+        )
     else:
         raise Exception("Unknown scenario")
     return scenario

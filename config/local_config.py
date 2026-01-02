@@ -46,9 +46,10 @@ def setup_local_config():
         "office-31-size": [300, 300],
         "imageclef-size": [300, 300],
         "imageclef-target": 'pascal', # 'bing', 'caltech', 'imagenet', 'pascal'
+        "visda17-size": [384, 216],
         # Distribution shift scenario
         # MNIST_TO_USPS, USPS_TO_MNIST, MNIST_TO_MNIST_M, SVHN_TO_MNIST,
-        # CIFAR-10-C, PORTRAITS, OFFICEHOME, IMAGECLEFDA
+        # CIFAR-10-C, PORTRAITS, OFFICEHOME, IMAGECLEFDA, VISDA17
         "scenario": "IMAGECLEFDA",
     }
 
