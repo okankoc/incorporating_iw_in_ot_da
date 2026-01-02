@@ -1,13 +1,13 @@
 def setup_local_config():
     config = {
         # Experiment details
-        "device": "auto",  # 'cpu' or 'auto' to find gpu automatically
+        "device": "cpu",  # 'cpu' or 'auto' to find gpu automatically
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        "model": "ResNet",
+        "model": "MLP",
         "resnet_size": 18,  # 18 or 50
         "pretrain": True,
         "num_pretrain_epochs": 3,  # if pretrain is True
-        "loss": "margin",  # 'margin', 'euclidean', 'cross-entropy'
+        "loss": "euclidean",  # 'margin', 'euclidean', 'cross-entropy'
         "optimizer": "adam",  # alternatives: adam, sgd
         "learning_rate": 1e-4,  # use 1e-4 for ResNets or a learning scheduler
         "momentum": 0.9,  # for SGD
@@ -15,8 +15,9 @@ def setup_local_config():
         "num_epochs": 1,
         "num_runs": 1,
         "algs": [
-            "lje",
-        ],  # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
+            "jdot",
+            "wrr",
+        ],  # wrr, weighted_wrr, cons_wrr, jdot, lje, erm, cc, dann, fdal, reverse-kl
         # Debugging algorithms
         "debug": True,
         "debug_every_n": 50,
@@ -50,7 +51,7 @@ def setup_local_config():
         # Distribution shift scenario
         # MNIST_TO_USPS, USPS_TO_MNIST, MNIST_TO_MNIST_M, SVHN_TO_MNIST,
         # CIFAR-10-C, PORTRAITS, OFFICE_31, OFFICEHOME, IMAGECLEFDA, VISDA17
-        "scenario": "IMAGECLEFDA",
+        "scenario": "MNIST_TO_USPS",
     }
 
     debug_config = {
@@ -73,7 +74,7 @@ def setup_local_config():
 
 
 def setup_alg_config(config):
-    wrr_config = {
+    config["wrr"] = {
         "scale": 1.0,
         "norm": 2,
         "entropy_reg": 1e-3,
@@ -81,7 +82,7 @@ def setup_alg_config(config):
         "print_info": False,
     }
 
-    weighted_wrr_config = {
+    config["weighted_wrr"] = {
         "scale": 1.0,
         "entropy_reg": 1e-1,  # only for sinkhorn uot
         "add_source_loss": True,
@@ -94,9 +95,17 @@ def setup_alg_config(config):
         "print_info": False,
     }
 
-    cons_wrr_config = {"norm": 2, "entropy_reg": 1e-3, "scale": 1.0, "thresh": 0.01}
+    config["jdot"] = {
+        "alpha": 0.001,
+        "lambda": 0.001,
+        "track_layer": -2,
+        "add_source_loss": True,
+        "use_squared_dist": False,
+    }
 
-    dann_config = {
+    config["cons_wrr"] = {"norm": 2, "entropy_reg": 1e-3, "scale": 1.0, "thresh": 0.01}
+
+    config["dann"] = {
         "conv_feat_layer": "flatten",
         "mlp_feat_layer": -2,  # ignored for ResNets
         "discriminator": "conv",  # conv or mlp
@@ -106,7 +115,7 @@ def setup_alg_config(config):
         "num_batches": 1000,  # rough estimate should be enough
     }
 
-    fdal_config = {
+    config["fdal"] = {
         "juncture": -1,  # For now we keep backbone/taskhead juncture at the last layer only
         "auxhead": "conv",  # conv or none
         "grl": {"max_iters": 3000, "hi": 0.6, "auto_step": True},
@@ -116,24 +125,17 @@ def setup_alg_config(config):
         "clip_grad_val": 10,
     }
 
-    cc_config = {
+    config["cc"] = {
         "entropy_reg": 1e-3,
         "norm": 2,
         "mode": "joint",  # or 'weighted_joint' or 'conditional'
         "add_source_loss": False,  # only for weighted_joint
     }
 
-    reverse_kl_config = {
+    config["reverse_kl"] = {
         "alpha_reverse": 0.1,
         "alpha_forward": 0.1,
         "augment_softmax": 0.0,
     }
 
-    config["wrr"] = wrr_config
-    config["weighted_wrr"] = weighted_wrr_config
-    config["cons_wrr"] = cons_wrr_config
-    config["dann"] = dann_config
-    config["fdal"] = fdal_config
-    config["cc"] = cc_config
-    config["reverse_kl"] = reverse_kl_config
     return config

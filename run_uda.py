@@ -107,6 +107,8 @@ def init_algorithm(config, name, model, loss_fun, opt, scenario, fabric):
         alg = adapt.oracle.OracleCC(config["cc"], fabric, model, loss_fun, opt)
     elif name == "erm":
         alg = adapt.erm.ERM(model, fabric, loss_fun, opt)
+    elif name == "jdot":
+        alg = adapt.jdot.JDOT(config["jdot"], fabric, model, loss_fun, opt)
     elif name == "dann":
         alg = adapt.dann.DANN(config["dann"], fabric, model, loss_fun, scenario)
     elif name == "fdal":
@@ -333,5 +335,5 @@ if __name__ == "__main__":
     # torch.autograd.set_detect_anomaly(True)
     # os.environ["TORCH_SHOW_CPP_STACKTRACES"] = "1"
 
-    # run_on_local()
-    run_on_cluster()
+    run_on_local()
+    # run_on_cluster()
