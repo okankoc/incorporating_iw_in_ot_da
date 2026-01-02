@@ -106,6 +106,12 @@ def setup_alg_config(config):
 
     config["cons_wrr"] = {"norm": 2, "entropy_reg": 1e-3, "scale": 1.0, "thresh": 0.01}
 
+    config["mmd"] = {
+        "alpha": 0.1,
+        "gammas": [0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0],
+        "use_squared_dist": True,
+    }
+
     config["dann"] = {
         "conv_feat_layer": "flatten",
         "mlp_feat_layer": -2,  # ignored for ResNets

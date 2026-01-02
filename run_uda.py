@@ -113,6 +113,8 @@ def init_algorithm(config, name, model, loss_fun, opt, scenario, fabric):
         alg = adapt.dann.DANN(config["dann"], fabric, model, loss_fun, scenario)
     elif name == "fdal":
         alg = adapt.fdal.FDAL(config["fdal"], fabric, model, loss_fun, scenario)
+    elif name == "mmd":
+        alg = adapt.mmd.MMD(config["mmd"], fabric, model, loss_fun, opt)
     elif name == "reverse_kl":
         model = ProbModel(model)
         alg = adapt.reverse_kl.ReverseKL(
