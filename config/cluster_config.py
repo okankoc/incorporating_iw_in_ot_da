@@ -3,13 +3,13 @@ def setup_cluster_config():
         # Experiment details
         "device": "auto",  # 'cpu' or 'auto' to find gpu automatically
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        "models": ["ConvNet2", "ResNet"],
-        "resnet_size": 50,  # 18 or 50
-        "pretrain": False,
+        "models": ["ResNet"],
+        "resnet_size": 18,  # 18 or 50
+        "pretrain": True,
         "num_pretrain_epochs": 5,  # if pretrain is True
         "loss": "euclidean",  # margin, euclidean or cross-entropy
         "optimizer": "adam",  # alternatives: adam, sgd
-        "learning_rate": 1e-3,  # use 1e-4 for ResNets or a learning scheduler
+        "learning_rate": 1e-4,  # use 1e-4 for ResNets or a learning scheduler
         "momentum": 0.9,  # for SGD
         "weight_decay": 0.0,
         "num_epochs": 5,
@@ -31,7 +31,7 @@ def setup_cluster_config():
 
     scenario_config = {
         # Enable only when running a dataset for the first-time
-        "preprocess": False
+        "preprocess": False,
         # Data loader options
         "batch_size": 64,
         # Test set dataloader options
@@ -49,9 +49,9 @@ def setup_cluster_config():
         "visda17-size": [384, 216],
         # Distribution shift scenario
         # MNIST_TO_USPS, USPS_TO_MNIST, MNIST_TO_MNIST_M, SVHN_TO_MNIST,
-        # CIFAR-10-C, PORTRAITS, OFFICEHOME, IMAGECLEFDA, VISDA17
+        # CIFAR-10-C, PORTRAITS, OFFICEHOME, OFFICE_31, IMAGECLEFDA, VISDA17
         "scenarios": [
-            "CIFAR-10-C",
+            "VISDA17",
         ],
     }
 

@@ -31,7 +31,7 @@ def setup_local_config():
 
     scenario_config = {
         # Enable only when running a dataset for the first-time
-        "preprocess": False
+        "preprocess": False,
         # Data loader options
         "batch_size": 64,
         # Test set dataloader options
@@ -49,7 +49,7 @@ def setup_local_config():
         "visda17-size": [384, 216],
         # Distribution shift scenario
         # MNIST_TO_USPS, USPS_TO_MNIST, MNIST_TO_MNIST_M, SVHN_TO_MNIST,
-        # CIFAR-10-C, PORTRAITS, OFFICEHOME, IMAGECLEFDA, VISDA17
+        # CIFAR-10-C, PORTRAITS, OFFICE_31, OFFICEHOME, IMAGECLEFDA, VISDA17
         "scenario": "IMAGECLEFDA",
     }
 

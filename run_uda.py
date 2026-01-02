@@ -333,5 +333,5 @@ if __name__ == "__main__":
     # torch.autograd.set_detect_anomaly(True)
     # os.environ["TORCH_SHOW_CPP_STACKTRACES"] = "1"
 
-    run_on_local()
-    # run_on_cluster()
+    # run_on_local()
+    run_on_cluster()

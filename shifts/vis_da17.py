@@ -43,5 +43,5 @@ class VisDA17:
         self.source_test_dataloader = DataLoader(test_source, **test_dataloader_options)
         self.target_test_dataloader = DataLoader(test_target, **test_dataloader_options)
 
-        self.source_name = source_name
-        self.target_name = target_name
+        self.source_name = 'train-sym'
+        self.target_name = 'validation-real'
