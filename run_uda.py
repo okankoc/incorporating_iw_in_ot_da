@@ -52,7 +52,7 @@ def init_scenario(config, fabric):
         )
     elif config["scenario"] == "MNIST_TO_MNIST_M":
         scenario = shifts.mnist_to_mnist_m.MNIST_to_MNIST_M(
-            dataloader_options, test_dataloader_options, preprocess=False
+            dataloader_options, test_dataloader_options, preprocess=config['preprocess']
         )
     elif config["scenario"] == "SVHN_TO_MNIST":
         scenario = shifts.svhn_to_mnist.SVHN_to_MNIST(
@@ -75,6 +75,10 @@ def init_scenario(config, fabric):
     elif config["scenario"] == "OFFICE_31":
         scenario = shifts.office_31.OFFICE31(
             dataloader_options, test_dataloader_options, target_name=config['office-31-target'], size=config['office-31-size']
+        )
+    elif config["scenario"] == "IMAGECLEFDA":
+        scenario = shifts.image_clef.IMAGECLEFDA(
+            dataloader_options, test_dataloader_options, preprocess=config['preprocess'], target_name=config['imageclef-target'], size=config['imageclef-size']
         )
     else:
         raise Exception("Unknown scenario")

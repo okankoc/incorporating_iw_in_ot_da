@@ -30,6 +30,8 @@ def setup_cluster_config():
     }
 
     scenario_config = {
+        # Enable only when running a dataset for the first-time
+        "preprocess": False
         # Data loader options
         "batch_size": 64,
         # Test set dataloader options
@@ -42,9 +44,11 @@ def setup_cluster_config():
         "officehome-size": [224, 224],
         "office-31-target": "webcam", # 'amazon', 'dslr', 'webcam'
         "office-31-size": [300, 300],
+        "imageclef-size": [300, 300],
+        "imageclef-target": 'pascal', # 'bing', 'caltech', 'imagenet', 'pascal'
         # Distribution shift scenario
         # MNIST_TO_USPS, USPS_TO_MNIST, MNIST_TO_MNIST_M, SVHN_TO_MNIST,
-        # CIFAR-10-C, PORTRAITS, OFFICEHOME,
+        # CIFAR-10-C, PORTRAITS, OFFICEHOME, IMAGECLEFDA
         "scenarios": [
             "CIFAR-10-C",
         ],
