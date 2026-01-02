@@ -1,7 +1,7 @@
 def setup_local_config():
     config = {
         # Experiment details
-        "device": "cpu",  # 'cpu' or 'auto' to find gpu automatically
+        "device": "auto",  # 'cpu' or 'auto' to find gpu automatically
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
         "model": "ResNet",
         "resnet_size": 18,  # 18 or 50
@@ -39,10 +39,13 @@ def setup_local_config():
         "portraits-size": [186, 171],
         "portraits-grayscale": False,
         "officehome-target": "real world", # 'art', 'clipart', 'product', 'real world'
+        "officehome-size": [224, 224],
+        "office-31-target": "webcam", # 'amazon', 'dslr', 'webcam'
+        "office-31-size": [300, 300],
         # Distribution shift scenario
         # MNIST_TO_USPS, USPS_TO_MNIST, MNIST_TO_MNIST_M, SVHN_TO_MNIST,
         # CIFAR-10-C, PORTRAITS, OFFICEHOME,
-        "scenario": "OFFICEHOME",
+        "scenario": "OFFICE_31",
     }
 
     debug_config = {

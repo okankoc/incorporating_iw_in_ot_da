@@ -10,12 +10,12 @@ class PORTRAITS:
     def __init__(self, dl_options, test_dl_options, size, grayscale, train_ratio=0.8):
         self.name = "PORTRAITS"
         self.num_classes = 2
-        self.input_size = size[0] * size[1]
         transforms = [v2.ToImage(), v2.ToDtype(torch.float32, scale=True), v2.Resize(size)]
         self.num_channels = 3
         if grayscale is True:
             self.num_channels = 1
             transforms.append(v2.Grayscale(1))
+        self.input_size = size[0] * size[1] * self.num_channels
         transforms = v2.Compose(transforms)
         dataset = ImageFolderWithFilenames(root="data/Portraits", transform=transforms)
 

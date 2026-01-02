@@ -39,6 +39,9 @@ def setup_cluster_config():
         "portraits-size": [186, 171],
         "portraits-grayscale": False,
         "officehome-target": "real world", # 'art', 'clipart', 'product', 'real world'
+        "officehome-size": [224, 224],
+        "office-31-target": "webcam", # 'amazon', 'dslr', 'webcam'
+        "office-31-size": [300, 300],
         # Distribution shift scenario
         # MNIST_TO_USPS, USPS_TO_MNIST, MNIST_TO_MNIST_M, SVHN_TO_MNIST,
         # CIFAR-10-C, PORTRAITS, OFFICEHOME,

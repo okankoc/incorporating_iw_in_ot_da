@@ -4,7 +4,7 @@ from torchvision import datasets
 from torchvision.transforms import v2
 
 
-class OFFICEHOME:
+class OFFICE31:
     def __init__(
         self,
         dataloader_options,
@@ -14,27 +14,25 @@ class OFFICEHOME:
         train_ratio=0.8,
         grayscale=False,
     ):
-        self.name = "OFFICEHOME"
+        self.name = "OFFICE31"
         self.num_channels = 3
-        self.num_classes = 65
+        self.num_classes = 31
         operations = [
             v2.ToImage(),
             v2.ToDtype(torch.float32, scale=True),
             v2.Resize(size),
         ]
         if grayscale is True:
+            self.num_channels = 1
             operations.append(v2.Grayscale(1))
-        transforms = v2.Compose(operations)
         self.input_size = size[0] * size[1] * self.num_channels
+        transforms = v2.Compose(operations)
 
         data = {}
-        data['art'] = datasets.ImageFolder(root='data/OfficeHomeDataset/Art', transform=transforms)
-        data['clipart'] = datasets.ImageFolder(root='data/OfficeHomeDataset/Clipart', transform=transforms)
-        data['product'] = datasets.ImageFolder(
-            root="data/OfficeHomeDataset/Product", transform=transforms
-        )
-        data['real world'] = datasets.ImageFolder(
-            root="data/OfficeHomeDataset/Real World", transform=transforms
+        data['amazon'] = datasets.ImageFolder(root='data/Office-31/amazon', transform=transforms)
+        data['dslr'] = datasets.ImageFolder(root='data/Office-31/dslr', transform=transforms)
+        data['webcam'] = datasets.ImageFolder(
+            root="data/Office-31/webcam", transform=transforms
         )
 
         target_data = data[target_name]

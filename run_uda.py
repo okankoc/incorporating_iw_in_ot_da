@@ -70,7 +70,11 @@ def init_scenario(config, fabric):
                                               grayscale=config['portraits-grayscale'], train_ratio=0.8)
     elif config["scenario"] == "OFFICEHOME":
         scenario = shifts.office_home.OFFICEHOME(
-            dataloader_options, test_dataloader_options, target_name=config['officehome-target'], size=(224, 224)
+            dataloader_options, test_dataloader_options, target_name=config['officehome-target'], size=config['officehome-size']
+        )
+    elif config["scenario"] == "OFFICE_31":
+        scenario = shifts.office_31.OFFICE31(
+            dataloader_options, test_dataloader_options, target_name=config['office-31-target'], size=config['office-31-size']
         )
     else:
         raise Exception("Unknown scenario")

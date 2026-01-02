@@ -6,3 +6,4 @@ from .portraits import PORTRAITS
 from .svhn_to_mnist import SVHN_to_MNIST
 from .usps_to_mnist import USPS_to_MNIST
 from .upsample import upsample_dataset
+from .office_31 import OFFICE31
