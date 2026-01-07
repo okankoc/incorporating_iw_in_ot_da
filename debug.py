@@ -3,6 +3,8 @@ import ot
 import geomloss
 import numpy as np
 import utils
+from scipy.cluster.hierarchy import dendrogram, linkage
+import matplotlib.pyplot as plt
 
 
 def debug_method(config, method, model, loss_fun, scenario, fabric, idx_des):
@@ -138,6 +140,105 @@ def debug_model(
         print(f"Weight norms for each layer: {weight_norms}")
     if config["calc_label_shift"]:
         calc_w_distance_label_shift(y_source, y_target, model.num_classes)
+    if config["calc_gradual_shift"]:
+        calc_gradual_shift(loss_fun, pred_source, pred_target, y_source, y_target, model.num_classes)
+
+
+def calc_gradual_shift(loss_fun, pred_source, pred_target, y_source, y_target, num_classes):
+    num_classes = 10
+    num_targets = pred_target.shape[0]
+    pred_source_cond = []
+    for i in range(num_classes):
+        cond = pred_source[torch.argmax(y_source, dim=1) == i]
+        pred_source_cond.append(cond)
+    Z = compute_single_linkage_clustering(pred_source_cond, pred_target)
+    # plot_linkage_clustering(Z, num_targets, num_classes)
+    y_pseudo = compute_linkage_pseudolabels(Z, num_targets, num_classes, soft=False)
+
+    pseudo_loss = loss_fun(y_pseudo, y_target)
+    print(f"linkage_pseudo_loss: {pseudo_loss.item()}")
+    pseudo_acc = torch.sum(torch.argmax(y_pseudo, dim=1) == torch.argmax(y_target, dim=1)) / num_targets
+    print(f"linkage acc: {100 * pseudo_acc}")
+
+
+def plot_linkage_clustering(Z, num_targets, num_classes):
+    plt.figure()
+    # Plot the dendrogram
+    def llf(idx):
+        if idx < num_targets:
+            return str(idx)
+        elif idx >= num_targets:
+            return "S" + str(idx - num_targets)
+
+    dendrogram(Z, labels=None, leaf_label_func=llf)
+    plt.xlabel("Data Points")
+    plt.ylabel("Distance")
+    plt.show()
+
+
+def compute_single_linkage_clustering(source_feat, target_feat):
+    num_targets = target_feat.shape[0]
+    num_classes = len(source_feat)
+    dist_targets = torch.cdist(target_feat, target_feat, p=2)
+    dist_mat = torch.zeros(num_targets + num_classes, num_targets + num_classes)
+    dist_mat[:num_targets, :num_targets] = dist_targets
+
+    for i in range(num_classes):
+        for j in range(num_classes):
+            dists = torch.cdist(source_feat[i], source_feat[j], p=2)
+            # w_dist = ot.emd2_1d(source_feat[i], source_feat[j])
+            min_dist = torch.min(dists)
+            dist_mat[num_targets+i, num_targets+j] = min_dist
+            # print(dist_mat[num_targets+i, num_targets+j])
+
+    for i in range(num_classes):
+        dist_to_source = torch.cdist(target_feat, source_feat[i], p=2)
+        min_dist_to_source, _ = torch.min(dist_to_source, dim=1)
+        # print(min_dist_to_source)
+        # Expand target distances with source cond as a new node
+        dist_mat[num_targets+i, :num_targets] = min_dist_to_source
+        dist_mat[:num_targets, num_targets+i] = min_dist_to_source
+    # Perform single linkage hierarchical clustering
+    y = dist_mat[torch.nonzero(torch.triu(dist_mat, diagonal=1), as_tuple=True)]
+    Z = linkage(y.detach().numpy(), method="single", metric='euclidean', optimal_ordering=True)
+    return Z
+
+
+def compute_linkage_pseudolabels(Z, num_target, num_classes, soft=True):
+    # Check pseudolabeling accuracy based on clustering output
+    # Compute the 'ultrametric distance'!
+    dists = torch.zeros(num_target, num_classes, dtype=torch.int)
+    for i in range(num_target):
+        idx_s = num_target + torch.arange(num_classes)
+        idx_pt = i
+        found_all = False
+        for j, row in enumerate(Z):
+            if found_all == False:
+                # Keep track of indices of the point and the source conditionals
+                if int(row[0]) == idx_pt:
+                    for k in range(num_classes):
+                        if int(row[1]) == idx_s[k] and dists[i, k] == 0:
+                            dists[i, k] = row[-1] - 1
+                    idx_pt = num_target + num_classes + j
+                if int(row[1]) == idx_pt:
+                    for k in range(num_classes):
+                        if int(row[1]) == idx_s[k] and dists[i, k] == 0:
+                            dists[i, k] = row[-1] - 1
+                    idx_pt = num_target + num_classes + j
+                found_all = True
+                for k in range(num_classes):
+                    if dists[i, k] == 0:
+                        found_all = False
+                    if int(row[0]) == idx_s[k] or int(row[1]) == idx_s[k]:
+                        idx_s[k] = num_target + num_classes + j
+    # print(dists)
+    if soft is True:
+        # Expected label = 0 times first column + 1 times second column
+        dists = torch.tensor(dists, dtype=torch.float)
+        return torch.nn.functional.softmin(dists, dim=1)
+    else:
+        y_pred = torch.argmin(dists, dim=1)
+        return utils.one_hot(y_pred, num_classes)
 
 
 def calc_grad_info(model, loss_fun, fabric, pred_source, pred_target, y_source):
@@ -236,7 +337,7 @@ def calc_ot(f_source, f_target, fabric, reg=1e-6):
     num_source = f_source.shape[0]
     num_target = f_target.shape[0]
 
-    ### Python crashes regularly with POT so switching to GeomLoss
+    ### Geomloss
     # ot_loss = geomloss.SamplesLoss(loss="sinkhorn", p=1, blur=reg)
     # cost = ot_loss(f_source, f_target)
 

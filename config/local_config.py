@@ -15,12 +15,11 @@ def setup_local_config():
         "num_epochs": 1,
         "num_runs": 1,
         "algs": [
-            "mmd",
             "wrr",
         ],  # wrr, weighted_wrr, cons_wrr, jdot, lje, erm, cc, dann, fdal, reverse-kl
         # Debugging algorithms
         "debug": True,
-        "debug_every_n": 50,
+        "debug_every_n": 10,
         "n_batches_per_epoch": -1,  # if -1 uses all batches
         "report_source_train_risk": False,
         "report_target_train_risk": False,
@@ -56,13 +55,14 @@ def setup_local_config():
 
     debug_config = {
         "calc_label_shift": False,
-        "calc_entanglement": False,
+        "calc_entanglement": True,
         "calc_margin": False,
         "calc_wrr": True,
         "calc_weighted_wrr": True,
         "verbose_weighted_wrr": False,
         "calc_weight_info": False,
         "calc_grad_info": False,
+        "calc_gradual_shift": True,
     }
 
     config["scenario_options"] = scenario_config
