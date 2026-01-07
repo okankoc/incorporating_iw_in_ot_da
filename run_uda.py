@@ -11,7 +11,7 @@ import utils
 import adapt
 import loss
 import shifts
-from debug import debug_method
+from debug.debug import debug_method
 from config.local_config import setup_local_config
 from config.cluster_config import setup_cluster_config
 from load_model import load_model, init_model, pretrain_model
