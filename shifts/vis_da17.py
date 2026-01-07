@@ -26,8 +26,12 @@ class VisDA17:
         transforms = v2.Compose(operations)
         self.input_size = size[0] * size[1] * self.num_channels
 
-        source_data = datasets.ImageFolder(root='data/VisDA17/train', transform=transforms)
-        target_data = datasets.ImageFolder(root='data/VisDA17/validation', transform=transforms)
+        source_data = datasets.ImageFolder(
+            root="data/VisDA17/train", transform=transforms
+        )
+        target_data = datasets.ImageFolder(
+            root="data/VisDA17/validation", transform=transforms
+        )
 
         train_size = int(train_ratio * len(source_data))
         test_size = int(len(source_data)) - train_size
@@ -43,5 +47,5 @@ class VisDA17:
         self.source_test_dataloader = DataLoader(test_source, **test_dataloader_options)
         self.target_test_dataloader = DataLoader(test_target, **test_dataloader_options)
 
-        self.source_name = 'train-sym'
-        self.target_name = 'validation-real'
+        self.source_name = "train-sym"
+        self.target_name = "validation-real"

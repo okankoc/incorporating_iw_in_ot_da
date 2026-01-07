@@ -16,19 +16,21 @@ matplotlib.use(backend="QtAgg", force=True)
 def regression_fun_Nd(x):
     # Watch out for values close to 0
     x_norm = torch.linalg.norm(x, dim=1)
-    return (torch.sin(torch.pi * x_norm) / (torch.pi * x_norm))
+    return torch.sin(torch.pi * x_norm) / (torch.pi * x_norm)
 
 
 def regression_fun_1d(x):
     # Watch out for values close to 0
-    return (torch.sin(torch.pi * x) / (torch.pi * x))
+    return torch.sin(torch.pi * x) / (torch.pi * x)
 
 
 def gen_gauss_covariates(mean, var, num_samples):
     if var.numel() == 1:
         return mean + torch.sqrt(var) * torch.randn(num_samples)
     dim = mean.shape[0]
-    return mean[:, torch.newaxis] + torch.linalg.cholesky(var) @ torch.randn(dim, num_samples)
+    return mean[:, torch.newaxis] + torch.linalg.cholesky(var) @ torch.randn(
+        dim, num_samples
+    )
 
 
 def gen_labels(fun, x, noise_var):
@@ -77,7 +79,9 @@ def opt_wrr_rule_with_sgd(X_source, X_target, y_source, thresh, theta0=None):
     return (theta, X_target @ theta)
 
 
-def opt_weighted_wrr_rule_iter_ls(X_source, X_target, y_source, thresh, epsilon, theta0=None):
+def opt_weighted_wrr_rule_iter_ls(
+    X_source, X_target, y_source, thresh, epsilon, theta0=None
+):
     dim = X_source.shape[-1]
     if theta0 is not None:
         theta = theta0
@@ -86,7 +90,7 @@ def opt_weighted_wrr_rule_iter_ls(X_source, X_target, y_source, thresh, epsilon,
     X_pq = torch.cat((X_source, X_target))
     num_source = X_source.shape[0]
     num_target = X_target.shape[0]
-    loss_fun = torch.nn.MSELoss(reduction='none')
+    loss_fun = torch.nn.MSELoss(reduction="none")
     prev_loss = 0.0
     total_loss = 1.0
     # TODO: Change the scale back to 0.5!
@@ -98,12 +102,17 @@ def opt_weighted_wrr_rule_iter_ls(X_source, X_target, y_source, thresh, epsilon,
         prev_loss = total_loss
         pred_source = X_source @ theta
         pred_target = X_target @ theta
-        Gamma, wrr_value = calc_weighted_wrr(pred_source, pred_target, y_source, epsilon, scale_bound)
+        Gamma, wrr_value = calc_weighted_wrr(
+            pred_source, pred_target, y_source, epsilon, scale_bound
+        )
         losses = loss_fun(pred_source, y_source)
-        costs = torch.cdist(pred_source[:, None], pred_target[:, None], p=2)**2 + losses[:, None]
+        costs = (
+            torch.cdist(pred_source[:, None], pred_target[:, None], p=2) ** 2
+            + losses[:, None]
+        )
         if add_coupling_der is True:
             mat = Gamma * costs - num_target * Gamma * torch.sum(Gamma * costs, dim=0)
-            mat = (Gamma - mat/epsilon)
+            mat = Gamma - mat / epsilon
         else:
             mat = Gamma
         w = torch.sum(mat, dim=1)
@@ -117,8 +126,10 @@ def opt_weighted_wrr_rule_iter_ls(X_source, X_target, y_source, thresh, epsilon,
             ),
             dim=0,
         )
-        R = (X_pq.T @ M_pq @ X_pq)
-        theta = torch.linalg.solve(X_source.T @ W @ X_source + R, X_source.T @ W @ y_source)
+        R = X_pq.T @ M_pq @ X_pq
+        theta = torch.linalg.solve(
+            X_source.T @ W @ X_source + R, X_source.T @ W @ y_source
+        )
         total_loss = wrr_value
         print(
             f"Total loss: {total_loss}, source loss: {torch.mean(losses)}, theta: {theta.detach().numpy()}"
@@ -286,7 +297,6 @@ def test_that_wrr_rule_can_be_optimized_in_linear_regression():
     #     theta_ls, X_source, X_target, y_source, thresh=1e-4
     # )
 
-
     y_target, _ = gen_labels(fun, x_target, s2_noise)
     loss = torch.nn.MSELoss()
     risk_source_ls = loss(pred_source_ls, y_source)
@@ -298,12 +308,12 @@ def test_that_wrr_rule_can_be_optimized_in_linear_regression():
     # risk_source_wrr_abs_dev = loss(X_source @ theta_wrr_abs_dev, y_source)
     # risk_target_wrr_abs_dev = loss(pred_target_wrr_abs_dev, y_target)
 
-    '''
+    """
     print("Parameters:")
     print(
         f"LS: {theta_ls}, WRR-sgd: {theta_wrr_sgd}, WRR-abs-dev: {theta_wrr_abs_dev}, WRR-iter-ls: {theta_wrr_iter_ls}"
     )
-    '''
+    """
 
     print(f"LS Source risk: {risk_source_ls}")
     print(f"LS Target risk: {risk_target_ls}")
@@ -535,15 +545,17 @@ def test_that_weighted_wrr_can_be_computed():
     print(f"Optimized solution: {wrr_weighted}, explicit solution: {wrr_alt}")
 
 
-def calc_weighted_wrr(pred_source, pred_target, y_source, epsilon, scale, unbalanced=False):
+def calc_weighted_wrr(
+    pred_source, pred_target, y_source, epsilon, scale, unbalanced=False
+):
     loss_fun = torch.nn.MSELoss(reduction="none")
     losses = loss_fun(pred_source, y_source)
     num_target = pred_target.shape[0]
     # Calculate explicit solution
-    cost_mat = torch.cdist(
-            pred_source[:, torch.newaxis],
-            pred_target[:, torch.newaxis],
-            p=2) ** 2
+    cost_mat = (
+        torch.cdist(pred_source[:, torch.newaxis], pred_target[:, torch.newaxis], p=2)
+        ** 2
+    )
     # losses = loss_fun(pred_source, y_source)
     total_mat = cost_mat + (losses[:, None] / scale)
 
@@ -552,7 +564,9 @@ def calc_weighted_wrr(pred_source, pred_target, y_source, epsilon, scale, unbala
     w_target = torch.ones(num_target) / num_target
 
     if unbalanced:
-        ot_mat = ot.unbalanced.mm_unbalanced(w_source, w_target, total_mat, reg_m=(1, 100))
+        ot_mat = ot.unbalanced.mm_unbalanced(
+            w_source, w_target, total_mat, reg_m=(1, 100)
+        )
     else:
         # Semi-relaxed
         ot_mat = torch.softmax(-total_mat / epsilon, dim=0) / num_target
@@ -563,10 +577,10 @@ def calc_weighted_wrr(pred_source, pred_target, y_source, epsilon, scale, unbala
 
 
 def compare_weighted_wrr_opt_to_iw_in_linear_regression():
-    '''
+    """
     - Try using negative squared distance as the kernel
     - Try using sq. exp. loss for WRR, that corresponds to the chosen squared exp. kernel
-    '''
+    """
 
     torch.manual_seed(0)
     num_source = 100
@@ -599,14 +613,8 @@ def compare_weighted_wrr_opt_to_iw_in_linear_regression():
     # w_wrr = torch.ones(num_source) / num_source
 
     theta_wrr, pred_target_wrr, w_wrr = opt_weighted_wrr_rule_iter_ls(
-        X_source,
-        X_target,
-        y_source,
-        thresh=1e-4,
-        epsilon=1e-2,
-        theta0=theta_iw
+        X_source, X_target, y_source, thresh=1e-4, epsilon=1e-2, theta0=theta_iw
     )
-
 
     loss = torch.nn.MSELoss()
     y_target, _ = gen_labels(regression_fun_1d, x_target, s2_noise)
@@ -623,30 +631,30 @@ def compare_weighted_wrr_opt_to_iw_in_linear_regression():
     risk_oracle = loss(pred_oracle, y_target)
     print(f"Oracle risk: {risk_oracle}")
 
-
     ls_mesh = torch.linspace(-0.5, 2.5, steps=100)
     X_mesh = torch.vstack((torch.ones(100), ls_mesh)).T
     pred_ls_mesh = X_mesh @ theta_ls
     pred_wrr_mesh = X_mesh @ theta_wrr
     pred_iw_mesh = X_mesh @ theta_iw
-    fig = plt.figure(figsize=(8,5))
+    fig = plt.figure(figsize=(8, 5))
     from matplotlib.gridspec import GridSpec
+
     gs = GridSpec(2, 1, height_ratios=[2, 1], hspace=0.05)
     ax = fig.add_subplot(gs[0])
     ax.scatter(x_source, y_source, c="red", s=5)
     ax.scatter(x_source, y_source_clean, c="black", s=15)
-    ax.plot(ls_mesh, pred_ls_mesh, linestyle='dashed', c="blue")
-    ax.plot(ls_mesh, pred_wrr_mesh, linestyle='dashed', c="brown")
-    ax.plot(ls_mesh, pred_iw_mesh, linestyle='dashed', c="purple")
+    ax.plot(ls_mesh, pred_ls_mesh, linestyle="dashed", c="blue")
+    ax.plot(ls_mesh, pred_wrr_mesh, linestyle="dashed", c="brown")
+    ax.plot(ls_mesh, pred_iw_mesh, linestyle="dashed", c="purple")
     plt.legend(["noisy labels", "clean labels", "lstsq", "WRR", "IW"])
 
     # Add histograms
     ax_hist = fig.add_subplot(gs[1], sharex=ax)
-    ax_hist.hist(x_source, bins=20, color='gray')
-    ax_hist.hist(x_target, bins=20, color='blue')
-    ax_hist.scatter(x_source, w_iw, color='red')
+    ax_hist.hist(x_source, bins=20, color="gray")
+    ax_hist.hist(x_target, bins=20, color="blue")
+    ax_hist.scatter(x_source, w_iw, color="red")
     sum_iw = torch.sum(w_iw)
-    ax_hist.scatter(x_source, sum_iw * w_wrr, color='black')
+    ax_hist.scatter(x_source, sum_iw * w_wrr, color="black")
 
     plt.setp(ax.get_xticklabels(), visible=False)
     plt.show()
@@ -704,43 +712,62 @@ def check_weighted_wrr_derivatives():
     # Create source inputs
     var_source = torch.randn(dim, dim)
     var_source = var_source @ var_source.T
-    x_source = gen_gauss_covariates(mean=torch.ones(dim), var=var_source, num_samples=num_source).T
+    x_source = gen_gauss_covariates(
+        mean=torch.ones(dim), var=var_source, num_samples=num_source
+    ).T
     pred_source = x_source @ beta
     y_source, _ = gen_labels(regression_fun_Nd, x_source, noise_var=0.01)
 
     # Create targets
     var_target = torch.randn(dim, dim)
     var_target = var_target @ var_target.T
-    x_target = gen_gauss_covariates(mean=2*torch.ones(dim), var=var_target, num_samples=num_target).T
+    x_target = gen_gauss_covariates(
+        mean=2 * torch.ones(dim), var=var_target, num_samples=num_target
+    ).T
     pred_target = x_target @ beta
 
     # Calculate OT distance
     eps = 1e-2
     # TODO: When scale is not 1.0 the above does not work
     scale_bound = 1.0
-    Gamma, wrr_value = calc_weighted_wrr(pred_source, pred_target, y_source, epsilon=eps, scale=scale_bound)
+    Gamma, wrr_value = calc_weighted_wrr(
+        pred_source, pred_target, y_source, epsilon=eps, scale=scale_bound
+    )
     wrr_value.backward()
     print(f"Auto-diff derivative: {beta.grad}")
 
     # Calculation using 2-for loops (before adding source risk!)
-    loss_fun = torch.nn.MSELoss(reduction='none')
+    loss_fun = torch.nn.MSELoss(reduction="none")
     losses = loss_fun(pred_source, y_source)
-    costs = torch.cdist(pred_source[:, None], pred_target[:, None], p=2)**2 + (1/scale_bound) * losses[:, None]
+    costs = (
+        torch.cdist(pred_source[:, None], pred_target[:, None], p=2) ** 2
+        + (1 / scale_bound) * losses[:, None]
+    )
     # Delta makes a small multiplicative correction, coming from the derivative of the diff. coupling!
     Delta = (num_target * torch.sum(Gamma * costs, dim=0) - costs) / eps
     mat = Gamma * (1 + Delta)
     w = torch.sum(mat, dim=1)
     der = torch.zeros(dim)
     for i in range(num_source):
-        der += 2*(x_source[i] @ beta - y_source[i]) * x_source[i] * w[i]
+        der += 2 * (x_source[i] @ beta - y_source[i]) * x_source[i] * w[i]
         for j in range(num_target):
-            der += 2 * mat[i,j] * (torch.outer(x_source[i] - x_target[j], x_source[i] - x_target[j]) @ beta)
+            der += (
+                2
+                * mat[i, j]
+                * (
+                    torch.outer(x_source[i] - x_target[j], x_source[i] - x_target[j])
+                    @ beta
+                )
+            )
     assert torch.allclose(beta.grad, der)
 
     # Faster matrix computation of derivative
-    loss_fun = torch.nn.MSELoss(reduction='none')
+    loss_fun = torch.nn.MSELoss(reduction="none")
     losses = loss_fun(pred_source, y_source)
-    costs = torch.cdist(pred_source[:, None], pred_target[:, None], p=2)**2 + (1/scale_bound) * losses[:, None]
+    costs = (
+        torch.cdist(pred_source[:, None], pred_target[:, None], p=2) ** 2
+        + (1 / scale_bound) * losses[:, None]
+    )
     Delta = (num_target * torch.sum(Gamma * costs, dim=0) - costs) / eps
     X_p = x_source
     X_pq = torch.cat((x_source, x_target))
@@ -754,9 +781,14 @@ def check_weighted_wrr_derivatives():
         ),
         dim=0,
     )
-    der = 2 * X_p.T @ W @ X_p @ beta + 2 * (X_pq.T @ M_pq @ X_pq) @ beta - 2 * (X_p.T @ W @ y_source)
+    der = (
+        2 * X_p.T @ W @ X_p @ beta
+        + 2 * (X_pq.T @ M_pq @ X_pq) @ beta
+        - 2 * (X_p.T @ W @ y_source)
+    )
     print(f"Custom calc. derivative: {der}")
     assert torch.allclose(beta.grad, der)
+
 
 if __name__ == "__main__":
     torch.set_default_dtype(torch.float64)

@@ -40,12 +40,12 @@ def setup_local_config():
         "cifar-10-corruptions": ["fog", "frost", "snow"],
         "portraits-size": [186, 171],
         "portraits-grayscale": False,
-        "officehome-target": "real world", # 'art', 'clipart', 'product', 'real world'
+        "officehome-target": "real world",  # 'art', 'clipart', 'product', 'real world'
         "officehome-size": [224, 224],
-        "office-31-target": "webcam", # 'amazon', 'dslr', 'webcam'
+        "office-31-target": "webcam",  # 'amazon', 'dslr', 'webcam'
         "office-31-size": [300, 300],
         "imageclef-size": [300, 300],
-        "imageclef-target": 'pascal', # 'bing', 'caltech', 'imagenet', 'pascal'
+        "imageclef-target": "pascal",  # 'bing', 'caltech', 'imagenet', 'pascal'
         "visda17-size": [384, 216],
         # Distribution shift scenario
         # MNIST_TO_USPS, USPS_TO_MNIST, MNIST_TO_MNIST_M, SVHN_TO_MNIST,

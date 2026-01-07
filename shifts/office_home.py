@@ -28,22 +28,26 @@ class OFFICEHOME:
         self.input_size = size[0] * size[1] * self.num_channels
 
         data = {}
-        data['art'] = datasets.ImageFolder(root='data/OfficeHomeDataset/Art', transform=transforms)
-        data['clipart'] = datasets.ImageFolder(root='data/OfficeHomeDataset/Clipart', transform=transforms)
-        data['product'] = datasets.ImageFolder(
+        data["art"] = datasets.ImageFolder(
+            root="data/OfficeHomeDataset/Art", transform=transforms
+        )
+        data["clipart"] = datasets.ImageFolder(
+            root="data/OfficeHomeDataset/Clipart", transform=transforms
+        )
+        data["product"] = datasets.ImageFolder(
             root="data/OfficeHomeDataset/Product", transform=transforms
         )
-        data['real world'] = datasets.ImageFolder(
+        data["real world"] = datasets.ImageFolder(
             root="data/OfficeHomeDataset/Real World", transform=transforms
         )
 
         target_data = data[target_name]
         source_data = []
-        source_name = ''
+        source_name = ""
         for name, dataset in data.items():
             if name != target_name:
                 source_data.append(dataset)
-                source_name += name + '_'
+                source_name += name + "_"
         source_data = torch.utils.data.ConcatDataset(source_data)
 
         train_size = int(train_ratio * len(source_data))

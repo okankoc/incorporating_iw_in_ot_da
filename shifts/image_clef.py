@@ -33,18 +33,26 @@ class IMAGECLEFDA:
         self.input_size = size[0] * size[1] * self.num_channels
 
         data = {}
-        data['bing'] = datasets.ImageFolder(root='data/image_CLEF/b', transform=transforms)
-        data['caltech'] = datasets.ImageFolder(root='data/image_CLEF/c', transform=transforms)
-        data['imagenet'] = datasets.ImageFolder(root='data/image_CLEF/i', transform=transforms)
-        data['pascal'] = datasets.ImageFolder(root='data/image_CLEF/p', transform=transforms)
+        data["bing"] = datasets.ImageFolder(
+            root="data/image_CLEF/b", transform=transforms
+        )
+        data["caltech"] = datasets.ImageFolder(
+            root="data/image_CLEF/c", transform=transforms
+        )
+        data["imagenet"] = datasets.ImageFolder(
+            root="data/image_CLEF/i", transform=transforms
+        )
+        data["pascal"] = datasets.ImageFolder(
+            root="data/image_CLEF/p", transform=transforms
+        )
 
         target_data = data[target_name]
         source_data = []
-        source_name = ''
+        source_name = ""
         for name, dataset in data.items():
             if name != target_name:
                 source_data.append(dataset)
-                source_name += name + '_'
+                source_name += name + "_"
         source_data = torch.utils.data.ConcatDataset(source_data)
 
         train_size = int(train_ratio * len(source_data))
@@ -64,11 +72,10 @@ class IMAGECLEFDA:
         self.source_name = source_name
         self.target_name = target_name
 
-
     def process_labels(self, root):
-        folders = ['b', 'i', 'c', 'p']
+        folders = ["b", "i", "c", "p"]
         for folder in folders:
-            labels_file = os.path.join(root, 'list', folder + "List.txt")
+            labels_file = os.path.join(root, "list", folder + "List.txt")
             out = pandas.read_csv(
                 labels_file, header=None, names=["name", "label"], sep=" "
             )

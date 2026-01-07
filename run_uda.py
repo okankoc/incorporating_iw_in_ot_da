@@ -52,7 +52,7 @@ def init_scenario(config, fabric):
         )
     elif config["scenario"] == "MNIST_TO_MNIST_M":
         scenario = shifts.mnist_to_mnist_m.MNIST_to_MNIST_M(
-            dataloader_options, test_dataloader_options, preprocess=config['preprocess']
+            dataloader_options, test_dataloader_options, preprocess=config["preprocess"]
         )
     elif config["scenario"] == "SVHN_TO_MNIST":
         scenario = shifts.svhn_to_mnist.SVHN_to_MNIST(
@@ -65,24 +65,38 @@ def init_scenario(config, fabric):
             corruptions=config["cifar-10-corruptions"],
         )
     elif config["scenario"] == "PORTRAITS":
-        scenario = shifts.portraits.PORTRAITS(dataloader_options,
-                                              test_dataloader_options, size=config['portraits-size'],
-                                              grayscale=config['portraits-grayscale'], train_ratio=0.8)
+        scenario = shifts.portraits.PORTRAITS(
+            dataloader_options,
+            test_dataloader_options,
+            size=config["portraits-size"],
+            grayscale=config["portraits-grayscale"],
+            train_ratio=0.8,
+        )
     elif config["scenario"] == "OFFICEHOME":
         scenario = shifts.office_home.OFFICEHOME(
-            dataloader_options, test_dataloader_options, target_name=config['officehome-target'], size=config['officehome-size']
+            dataloader_options,
+            test_dataloader_options,
+            target_name=config["officehome-target"],
+            size=config["officehome-size"],
         )
     elif config["scenario"] == "OFFICE_31":
         scenario = shifts.office_31.OFFICE31(
-            dataloader_options, test_dataloader_options, target_name=config['office-31-target'], size=config['office-31-size']
+            dataloader_options,
+            test_dataloader_options,
+            target_name=config["office-31-target"],
+            size=config["office-31-size"],
         )
     elif config["scenario"] == "IMAGECLEFDA":
         scenario = shifts.image_clef.IMAGECLEFDA(
-            dataloader_options, test_dataloader_options, preprocess=config['preprocess'], target_name=config['imageclef-target'], size=config['imageclef-size']
+            dataloader_options,
+            test_dataloader_options,
+            preprocess=config["preprocess"],
+            target_name=config["imageclef-target"],
+            size=config["imageclef-size"],
         )
     elif config["scenario"] == "VISDA17":
         scenario = shifts.vis_da17.VisDA17(
-            dataloader_options, test_dataloader_options, size=config['visda17-size']
+            dataloader_options, test_dataloader_options, size=config["visda17-size"]
         )
     else:
         raise Exception("Unknown scenario")

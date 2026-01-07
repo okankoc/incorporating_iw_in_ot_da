@@ -10,7 +10,11 @@ class PORTRAITS:
     def __init__(self, dl_options, test_dl_options, size, grayscale, train_ratio=0.8):
         self.name = "PORTRAITS"
         self.num_classes = 2
-        transforms = [v2.ToImage(), v2.ToDtype(torch.float32, scale=True), v2.Resize(size)]
+        transforms = [
+            v2.ToImage(),
+            v2.ToDtype(torch.float32, scale=True),
+            v2.Resize(size),
+        ]
         self.num_channels = 3
         if grayscale is True:
             self.num_channels = 1

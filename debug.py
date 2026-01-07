@@ -141,10 +141,14 @@ def debug_model(
     if config["calc_label_shift"]:
         calc_w_distance_label_shift(y_source, y_target, model.num_classes)
     if config["calc_gradual_shift"]:
-        calc_gradual_shift(loss_fun, pred_source, pred_target, y_source, y_target, model.num_classes)
+        calc_gradual_shift(
+            loss_fun, pred_source, pred_target, y_source, y_target, model.num_classes
+        )
 
 
-def calc_gradual_shift(loss_fun, pred_source, pred_target, y_source, y_target, num_classes):
+def calc_gradual_shift(
+    loss_fun, pred_source, pred_target, y_source, y_target, num_classes
+):
     num_classes = 10
     num_targets = pred_target.shape[0]
     pred_source_cond = []
@@ -157,12 +161,16 @@ def calc_gradual_shift(loss_fun, pred_source, pred_target, y_source, y_target, n
 
     pseudo_loss = loss_fun(y_pseudo, y_target)
     print(f"linkage_pseudo_loss: {pseudo_loss.item()}")
-    pseudo_acc = torch.sum(torch.argmax(y_pseudo, dim=1) == torch.argmax(y_target, dim=1)) / num_targets
+    pseudo_acc = (
+        torch.sum(torch.argmax(y_pseudo, dim=1) == torch.argmax(y_target, dim=1))
+        / num_targets
+    )
     print(f"linkage acc: {100 * pseudo_acc}")
 
 
 def plot_linkage_clustering(Z, num_targets, num_classes):
     plt.figure()
+
     # Plot the dendrogram
     def llf(idx):
         if idx < num_targets:
@@ -188,7 +196,7 @@ def compute_single_linkage_clustering(source_feat, target_feat):
             dists = torch.cdist(source_feat[i], source_feat[j], p=2)
             # w_dist = ot.emd2_1d(source_feat[i], source_feat[j])
             min_dist = torch.min(dists)
-            dist_mat[num_targets+i, num_targets+j] = min_dist
+            dist_mat[num_targets + i, num_targets + j] = min_dist
             # print(dist_mat[num_targets+i, num_targets+j])
 
     for i in range(num_classes):
@@ -196,11 +204,13 @@ def compute_single_linkage_clustering(source_feat, target_feat):
         min_dist_to_source, _ = torch.min(dist_to_source, dim=1)
         # print(min_dist_to_source)
         # Expand target distances with source cond as a new node
-        dist_mat[num_targets+i, :num_targets] = min_dist_to_source
-        dist_mat[:num_targets, num_targets+i] = min_dist_to_source
+        dist_mat[num_targets + i, :num_targets] = min_dist_to_source
+        dist_mat[:num_targets, num_targets + i] = min_dist_to_source
     # Perform single linkage hierarchical clustering
     y = dist_mat[torch.nonzero(torch.triu(dist_mat, diagonal=1), as_tuple=True)]
-    Z = linkage(y.detach().numpy(), method="single", metric='euclidean', optimal_ordering=True)
+    Z = linkage(
+        y.detach().numpy(), method="single", metric="euclidean", optimal_ordering=True
+    )
     return Z
 
 

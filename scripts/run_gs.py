@@ -15,10 +15,12 @@ def compute_single_linkage_clustering(source_feat, target_feat):
 
     for i in range(num_classes):
         for j in range(num_classes):
-            dists = torch.tensor(cdist(source_feat[i], source_feat[j], metric="euclidean"))
+            dists = torch.tensor(
+                cdist(source_feat[i], source_feat[j], metric="euclidean")
+            )
             # w_dist = ot.emd2_1d(source_feat[i], source_feat[j])
             min_dist = torch.min(dists)
-            dist_mat[num_targets+i, num_targets+j] = min_dist
+            dist_mat[num_targets + i, num_targets + j] = min_dist
             # print(dist_mat[num_targets+i, num_targets+j])
 
     for i in range(num_classes):
@@ -27,16 +29,17 @@ def compute_single_linkage_clustering(source_feat, target_feat):
         min_dist_to_source, _ = torch.min(dist_to_source, dim=1)
         # print(min_dist_to_source)
         # Expand target distances with source cond as a new node
-        dist_mat[num_targets+i, :num_targets] = min_dist_to_source
-        dist_mat[:num_targets, num_targets+i] = min_dist_to_source
+        dist_mat[num_targets + i, :num_targets] = min_dist_to_source
+        dist_mat[:num_targets, num_targets + i] = min_dist_to_source
     # Perform single linkage hierarchical clustering
     y = dist_mat[torch.nonzero(torch.triu(dist_mat, diagonal=1), as_tuple=True)]
-    Z = linkage(y, method="single", metric='euclidean', optimal_ordering=True)
+    Z = linkage(y, method="single", metric="euclidean", optimal_ordering=True)
     return Z
 
 
 def plot_linkage_clustering(Z, num_targets, num_classes):
     plt.figure()
+
     # Plot the dendrogram
     def llf(idx):
         if idx < num_targets:
@@ -53,7 +56,9 @@ def gen_gauss_covariates(mean, var, num_samples):
     if var.numel() == 1:
         return mean + torch.sqrt(var) * torch.randn(num_samples)
     dim = mean.shape[0]
-    return mean[:, torch.newaxis] + torch.linalg.cholesky(var) @ torch.randn(dim, num_samples)
+    return mean[:, torch.newaxis] + torch.linalg.cholesky(var) @ torch.randn(
+        dim, num_samples
+    )
 
 
 def opt_wrr_rule_iter_ls(X_source, X_target, y_source, thresh, theta0=None):
@@ -127,7 +132,9 @@ def opt_wrr_rule_with_sgd(X_source, X_target, y_source, thresh, theta0=None):
         source_loss = loss(pred_source, y_source)
 
         # Compute the WRR bound for squared distance
-        cost_mat = ot.utils.euclidean_distances(pred_source[:, torch.newaxis], pred_target[:, torch.newaxis], squared=True)
+        cost_mat = ot.utils.euclidean_distances(
+            pred_source[:, torch.newaxis], pred_target[:, torch.newaxis], squared=True
+        )
         ot_dist = torch.sum(Gamma * cost_mat)
         total_loss = source_loss + 0.5 * ot_dist
         total_loss.backward()
@@ -139,7 +146,6 @@ def opt_wrr_rule_with_sgd(X_source, X_target, y_source, thresh, theta0=None):
         opt.zero_grad()
     theta.requires_grad = False
     return (theta, X_target @ theta)
-
 
 
 def opt_pseudolabels_iter_ls(X_source, X_target, y_source, thresh, theta0=None):
@@ -162,10 +168,10 @@ def opt_pseudolabels_iter_ls(X_source, X_target, y_source, thresh, theta0=None):
         pred_source = X_source @ theta
         pred_target = X_target @ theta
 
-        pred1_source = pred_source[:num_source//2]
-        pred2_source = pred_source[num_source//2:]
-        pred1_target = pred_target[:num_target//2]
-        pred2_target = pred_target[num_target//2:]
+        pred1_source = pred_source[: num_source // 2]
+        pred2_source = pred_source[num_source // 2 :]
+        pred1_target = pred_target[: num_target // 2]
+        pred2_target = pred_target[num_target // 2 :]
         source_feat_cond = [pred1_source[:, None], pred2_source[:, None]]
         target_feat_cond = [pred1_target[:, None], pred2_target[:, None]]
         target_feat = torch.hstack((pred1_target, pred2_target))[:, None]
@@ -223,10 +229,10 @@ def compute_linkage_pseudolabels(Z, num_target, soft=True):
 
 
 def check_gradual_shift_in_linear_classification():
-    '''
+    """
     TODO: Test also weighted WRR whenever both source and target cannot be both seperated!
     TODO: Should we feed in the whole set of source points to the clusterer?
-    '''
+    """
 
     torch.manual_seed(2)
     num_target = 10
@@ -237,10 +243,14 @@ def check_gradual_shift_in_linear_classification():
     mean2_source = -2 * torch.ones(dim)
     var1_source = 0.4 * torch.eye(dim)
     var2_source = var1_source
-    x1_source = gen_gauss_covariates(mean1_source, var1_source, num_samples=num_source//2).T
-    x2_source = gen_gauss_covariates(mean2_source, var2_source, num_samples=num_source//2).T
-    y1_source = torch.ones(num_source//2)
-    y2_source = -torch.ones(num_source//2)
+    x1_source = gen_gauss_covariates(
+        mean1_source, var1_source, num_samples=num_source // 2
+    ).T
+    x2_source = gen_gauss_covariates(
+        mean2_source, var2_source, num_samples=num_source // 2
+    ).T
+    y1_source = torch.ones(num_source // 2)
+    y2_source = -torch.ones(num_source // 2)
 
     x_source = torch.vstack((x1_source, x2_source))
     X_source = torch.hstack((torch.ones(num_source, 1), x_source))
@@ -261,18 +271,22 @@ def check_gradual_shift_in_linear_classification():
     shift_direction_2 = 10 * torch.tensor([0.0, 1.0])
     var1_target = var1_source
     var2_target = var2_source
-    x_target = torch.zeros(num_target//2, 2, 2)
+    x_target = torch.zeros(num_target // 2, 2, 2)
     num_gen = num_target // num_shifts
     for i in range(num_shifts):
         mean1_target = mean1_source - (i / num_shifts) * shift_direction_1
         mean2_target = mean2_source + (i / num_shifts) * shift_direction_2
-        x_target[i*num_gen//2 : (i+1)*num_gen//2, :, 0] = gen_gauss_covariates(mean1_target, var1_target, num_samples=num_gen//2).T
-        x_target[i*num_gen//2 : (i+1)*num_gen//2, :, 1] = gen_gauss_covariates(mean2_target, var2_target, num_samples=num_gen//2).T
+        x_target[i * num_gen // 2 : (i + 1) * num_gen // 2, :, 0] = (
+            gen_gauss_covariates(mean1_target, var1_target, num_samples=num_gen // 2).T
+        )
+        x_target[i * num_gen // 2 : (i + 1) * num_gen // 2, :, 1] = (
+            gen_gauss_covariates(mean2_target, var2_target, num_samples=num_gen // 2).T
+        )
     x_target = torch.vstack((x_target[:, :, 0], x_target[:, :, 1]))
-    y1_target = torch.ones(num_target//2)
-    y2_target = -torch.ones(num_target//2)
+    y1_target = torch.ones(num_target // 2)
+    y2_target = -torch.ones(num_target // 2)
     y_target = torch.hstack((y1_target, y2_target))
-    X_target = torch.hstack((torch.ones(num_target,1), x_target))
+    X_target = torch.hstack((torch.ones(num_target, 1), x_target))
 
     # Check target accuracy, it should be poor for LS!
     pred_target_ls = X_target @ theta_ls
@@ -282,17 +296,19 @@ def check_gradual_shift_in_linear_classification():
     print(f"Accuracy % = {acc}")
 
     # Viz source and target inputs!
-    plt.scatter(x1_source[:, 0], x1_source[:, 1], s=20, c='b', marker='*')
-    plt.scatter(x2_source[:, 0], x2_source[:, 1], s=20, c='b', marker='^')
-    plt.scatter(x_target[:, 0], x_target[:, 1], s=20, c='r', marker='+')
+    plt.scatter(x1_source[:, 0], x1_source[:, 1], s=20, c="b", marker="*")
+    plt.scatter(x2_source[:, 0], x2_source[:, 1], s=20, c="b", marker="^")
+    plt.scatter(x_target[:, 0], x_target[:, 1], s=20, c="r", marker="+")
 
     # Draw the decision boundary where predictions are zero!
     x_plot = torch.arange(start=-5, end=5, step=0.05)
     y_plot = (-theta_ls[0] - theta_ls[1] * x_plot) / theta_ls[2]
-    plt.plot(x_plot, y_plot, c='b', linestyle='--')
+    plt.plot(x_plot, y_plot, c="b", linestyle="--")
 
     # Test WRR-based optimizer
-    theta_wrr, pred_target_wrr = opt_wrr_rule_iter_ls(X_source, X_target, y_source, thresh=1e-4)
+    theta_wrr, pred_target_wrr = opt_wrr_rule_iter_ls(
+        X_source, X_target, y_source, thresh=1e-4
+    )
     # Interestingly, the SGD based optimizer does not work well here!
     # Seems to get stuck at local optima?
     # print('Trying WRR opt with SGD...')
@@ -301,7 +317,7 @@ def check_gradual_shift_in_linear_classification():
     # Draw the decision boundary where predictions are zero!
     x_plot = torch.arange(start=-1, end=1, step=0.05)
     y_plot = (-theta_wrr[0] - theta_wrr[1] * x_plot) / theta_wrr[2]
-    plt.plot(x_plot, y_plot, c='r', linestyle='--')
+    plt.plot(x_plot, y_plot, c="r", linestyle="--")
 
     # Check target accuracy, it should be good for WRR!
     print(f"CE loss: {loss(pred_target_wrr, y_target)}")
@@ -310,7 +326,9 @@ def check_gradual_shift_in_linear_classification():
     print(f"Accuracy % = {acc}")
 
     # Test linkage-clustering based pseudolabeler
-    theta_pl, pred_target_pl = opt_pseudolabels_iter_ls(X_source, X_target, y_source, thresh=1e-4, theta0=theta_ls)
+    theta_pl, pred_target_pl = opt_pseudolabels_iter_ls(
+        X_source, X_target, y_source, thresh=1e-4, theta0=theta_ls
+    )
     print(f"CE loss: {loss(pred_target_pl, y_target)}")
     y_hat_target_pl = 2 * (pred_target_pl > 0) - 1
     acc = torch.sum(y_hat_target_pl == y_target) / num_target

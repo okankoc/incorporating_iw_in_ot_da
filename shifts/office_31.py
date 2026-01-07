@@ -29,19 +29,23 @@ class OFFICE31:
         transforms = v2.Compose(operations)
 
         data = {}
-        data['amazon'] = datasets.ImageFolder(root='data/Office-31/amazon', transform=transforms)
-        data['dslr'] = datasets.ImageFolder(root='data/Office-31/dslr', transform=transforms)
-        data['webcam'] = datasets.ImageFolder(
+        data["amazon"] = datasets.ImageFolder(
+            root="data/Office-31/amazon", transform=transforms
+        )
+        data["dslr"] = datasets.ImageFolder(
+            root="data/Office-31/dslr", transform=transforms
+        )
+        data["webcam"] = datasets.ImageFolder(
             root="data/Office-31/webcam", transform=transforms
         )
 
         target_data = data[target_name]
         source_data = []
-        source_name = ''
+        source_name = ""
         for name, dataset in data.items():
             if name != target_name:
                 source_data.append(dataset)
-                source_name += name + '_'
+                source_name += name + "_"
         source_data = torch.utils.data.ConcatDataset(source_data)
 
         train_size = int(train_ratio * len(source_data))
