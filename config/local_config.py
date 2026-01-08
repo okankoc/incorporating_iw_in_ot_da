@@ -15,7 +15,7 @@ def setup_local_config():
         "num_epochs": 1,
         "num_runs": 1,
         "algs": [
-            "pseudolabel",
+            "wrr",
         ],  # wrr, weighted_wrr, cons_wrr, jdot, lje, erm, cc, dann, fdal, reverse-kl
         # Debugging algorithms
         "debug": True,
@@ -78,7 +78,6 @@ def setup_alg_config(config):
         "scale": 1.0,
         "norm": 2,
         "entropy_reg": 1e-3,
-        "propagate_labels": False,
         "print_info": False,
     }
 

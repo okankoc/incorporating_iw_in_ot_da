@@ -79,7 +79,6 @@ def setup_alg_config(config):
         "scale": 1.0,
         "norm": 2,
         "entropy_reg": 1e-3,
-        "propagate_labels": False,
         "print_info": False,
     }
 

@@ -2,6 +2,7 @@ import torch
 import geomloss
 import ot
 
+import linkage
 
 # Wasserstein Marginal Distance regularized source risk minimization using model outputs
 class WRR:
@@ -12,7 +13,6 @@ class WRR:
         self.scale = config["scale"]
         self.p = config["norm"]
         self.reg = config["entropy_reg"]
-        self.propagate_labels = config["propagate_labels"]
         self.print_info = config["print_info"]
         model, self.opt = fabric.setup(model, self.opt)
 
@@ -34,27 +34,52 @@ class WRR:
         ot_mat = ot.emd(w_source, w_target, cost_mat, numItermax=5000)
         return ot_mat, torch.sum(ot_mat * cost_mat)
 
+
+    # For now storing this code here (which doesn't work well anyway) to simplify adapt()
+    def propagate_labels(self, pred_source, pred_target, fabric):
+        ot_map, _ = self.calc_ot_map(pred_source, pred_target, fabric.device)
+        num_target = pred_target.shape[0]
+        y_hat_target = (
+            num_target * ot_map.T @ torch.argmax(y_source, dim=1).float()
+            ).to(torch.int64)
+        loss = self.scale * source_loss + self.loss_fun.forward_int(
+            pred_target, y_hat_target
+        )
+        fabric.backward(loss)
+        self.opt.step()
+
+
+    # Similarly storing the ultrametric-based computation here
+    def compute_ultrametric_loss(self, pred_source, pred_target, fabric):
+        import linkage
+        num_source = pred_source.shape[0]
+        num_target = pred_target.shape[0]
+        # Testing using the hierarchical clustering's ultrametric
+        # instead of the original metric
+        ultra_dist_mat = linkage.compute_soft_cluster(pred_source, pred_target)
+        # original_dist_mat = torch.cdist(pred_source, pred_target, p=2)
+        # print(ultra_dist_mat[:5, :5], original_dist_mat[:5, :5])
+        w_source = torch.ones(num_source, device=fabric.device) / num_source
+        w_target = torch.ones(num_target, device=fabric.device) / num_target
+        ot_mat = ot.emd(w_source, w_target, ultra_dist_mat, numItermax=5000)
+        ultra_ot_cost = torch.sum(ot_mat * ultra_dist_mat)
+        loss = self.scale * source_loss + ultra_ot_cost
+        return loss
+
+
     def adapt(self, model, fabric, X_source, y_source, X_target, y_target=[]):
         self.opt.zero_grad()
         pred_source = model(X_source)
         pred_target = model(X_target)
         source_loss = self.loss_fun(pred_source, y_source)
-        if self.propagate_labels:
-            ot_map, _ = self.calc_ot_map(pred_source, pred_target, fabric.device)
-            num_target = pred_target.shape[0]
-            y_hat_target = (
-                num_target * ot_map.T @ torch.argmax(y_source, dim=1).float()
-            ).to(torch.int64)
-            loss = self.scale * source_loss + self.loss_fun.forward_int(
-                pred_target, y_hat_target
-            )
-        else:
-            try:
-                ot_cost = self.calc_ot_loss(pred_source, pred_target)
-            except:
-                print("For some reason geomloss failed. Reverting to ot.emd routine")
-                _, ot_cost = self.calc_ot_map(pred_source, pred_target, fabric.device)
-            loss = self.scale * source_loss + ot_cost
+
+        try:
+            ot_cost = self.calc_ot_loss(pred_source, pred_target)
+        except:
+            print("For some reason geomloss failed. Reverting to ot.emd routine")
+            _, ot_cost = self.calc_ot_map(pred_source, pred_target, fabric.device)
+        loss = self.scale * source_loss + ot_cost
+
         fabric.backward(loss)
         self.opt.step()
         if self.print_info:
