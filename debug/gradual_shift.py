@@ -17,20 +17,20 @@ def calc_gradual_shift(
 
     ##### PLOT DISTANCES FROM THE SOURCE CONDITIONAL MEANS
     cond_dist, correct_labeled = compute_cond_dist(pred_target, y_target, source_means, num_classes)
-    # plot_distances(cond_dist, correct_labeled, num_classes)
-    # plt.show()
+    plot_distances(cond_dist, correct_labeled, num_classes)
+    plt.show()
 
     ##### LINKAGE METHOD TO CHECK IF THERE IS GRADUAL SHIFT
     Z = linkage.compute_cluster(pred_source_cond, pred_target, method='single')
     # linkage.plot_cluster(Z, num_targets, num_classes)
     y_pseudo = linkage.compute_pseudolabels(Z, num_targets, num_classes, soft=False)
     pseudo_loss = loss_fun(y_pseudo, y_target)
-    print(f"linkage_pseudo_loss: {pseudo_loss.item()}")
+    print(f"Linkage_pseudo_loss: {pseudo_loss.item()}")
     pseudo_acc = (
         torch.sum(torch.argmax(y_pseudo, dim=1) == torch.argmax(y_target, dim=1))
         / num_targets
     )
-    print(f"linkage acc: {100 * pseudo_acc}")
+    print(f"Linkage acc: {pseudo_acc}")
 
 
 def compute_cond_dist(pred_target, y_target, source_means, num_classes):

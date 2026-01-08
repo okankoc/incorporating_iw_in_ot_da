@@ -9,13 +9,13 @@ def setup_local_config():
         "num_pretrain_epochs": 3,  # if pretrain is True
         "loss": "euclidean",  # 'margin', 'euclidean', 'cross-entropy'
         "optimizer": "adam",  # alternatives: adam, sgd
-        "learning_rate": 1e-4,  # use 1e-4 for ResNets or a learning scheduler
+        "learning_rate": 1e-3,  # use 1e-4 for ResNets or a learning scheduler
         "momentum": 0.9,  # for SGD
         "weight_decay": 0.0,
         "num_epochs": 1,
         "num_runs": 1,
         "algs": [
-            "wrr",
+            "pseudolabel",
         ],  # wrr, weighted_wrr, cons_wrr, jdot, lje, erm, cc, dann, fdal, reverse-kl
         # Debugging algorithms
         "debug": True,
@@ -62,7 +62,7 @@ def setup_local_config():
         "verbose_weighted_wrr": False,
         "calc_weight_info": False,
         "calc_grad_info": False,
-        "calc_gradual_shift": True,
+        "calc_gradual_shift": False,
     }
 
     config["scenario_options"] = scenario_config
@@ -93,6 +93,10 @@ def setup_alg_config(config):
         "autograd_at_convergence": True,
         "reg_m": (1.0, 100.0),
         "print_info": False,
+    }
+
+    config['pseudolabel'] = {
+        'linkage': 'single',
     }
 
     config["jdot"] = {

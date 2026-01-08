@@ -29,20 +29,27 @@ def compute_cluster(source_feat, target_feat, method):
 
     for i in range(num_classes):
         for j in range(num_classes):
-            dists = torch.cdist(source_feat[i], source_feat[j], p=2)
-            min_dist = torch.min(dists)
+            try:
+                dists = torch.cdist(source_feat[i], source_feat[j], p=2)
+                min_dist = torch.min(dists)
+            except:
+                min_dist = 1e3
             dist_mat[num_targets + i, num_targets + j] = min_dist
             # print(dist_mat[num_targets+i, num_targets+j])
 
     for i in range(num_classes):
-        dist_to_source = torch.cdist(target_feat, source_feat[i], p=2)
-        min_dist_to_source, _ = torch.min(dist_to_source, dim=1)
+        try:
+            dist_to_source = torch.cdist(target_feat, source_feat[i], p=2)
+            min_dist_to_source, _ = torch.min(dist_to_source, dim=1)
+        except:
+            min_dist_to_source = 1e3 * torch.ones(num_targets)
         # print(min_dist_to_source)
         # Expand target distances with source cond as a new node
         dist_mat[num_targets + i, :num_targets] = min_dist_to_source
         dist_mat[:num_targets, num_targets + i] = min_dist_to_source
     # Perform single linkage hierarchical clustering
-    y = dist_mat[torch.nonzero(torch.triu(dist_mat, diagonal=1), as_tuple=True)]
+    idx = torch.triu_indices(dist_mat.size(0), dist_mat.size(1), offset=1)
+    y = dist_mat[idx[0], idx[1]]
     Z = linkage(y, method, metric="euclidean", optimal_ordering=True)
     return Z
 
