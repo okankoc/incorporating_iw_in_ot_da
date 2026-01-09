@@ -97,32 +97,18 @@ def debug_model(
         # print(f"Weighted entanglement: {weighted_entanglement}")
         # print(f"Weighted OT acc: {torch.sum(w_ot_mat * y_acc)}")
 
+        # Check entanglement of ultrametric-based coupling
+        # import linkage
+        # num_source, num_target = pred_source.shape[0], pred_target.shape[0]
+        # ultra_dist_mat = linkage.compute_soft_cluster(pred_source, pred_target)
+        # w_source = torch.ones(num_source, device=fabric.device) / num_source
+        # w_target = torch.ones(num_target, device=fabric.device) / num_target
+        # ultra_ot_mat = ot.emd(w_source, w_target, ultra_dist_mat, numItermax=5000)
+        # ultra_entanglement = torch.sum(ultra_ot_mat * y_dist)
+        # print(f"Ultrametric-OT entanglement: {ultra_entanglement}")
+
         # Check entanglement/accuracy of selective alignment
-        cost_mat = torch.cdist(pred_source, pred_target, p=2)
-        std_cost, mean_cost = torch.std_mean(cost_mat)
-        thresh = mean_cost - std_cost
-        filter_mat = cost_mat < thresh
-        filt_ent = torch.sum(ot_mat * filter_mat * y_dist) / torch.sum(
-            ot_mat * filter_mat
-        )
-        filt_acc = torch.sum(ot_mat * filter_mat * y_acc) / torch.sum(
-            ot_mat * filter_mat
-        )
-        print(f"Distance filtered entanglement/acc: {filt_ent}/{filt_acc}")
-
-        std_margin, mean_margin, margin, correct = calc_margin(pred_source, y_source)
-        thresh = mean_margin + std_margin
-        filter_vec_margin = margin > thresh
-        filt_ent = torch.sum(
-            ot_mat[correct][filter_vec_margin] * y_dist[correct][filter_vec_margin]
-        )
-        filt_ent /= torch.sum(ot_mat[correct][filter_vec_margin])
-        filt_acc = torch.sum(
-            ot_mat[correct][filter_vec_margin] * y_acc[correct][filter_vec_margin]
-        )
-        filt_acc /= torch.sum(ot_mat[correct][filter_vec_margin])
-        print(f"Margin filtered entanglement/acc: {filt_ent}/{filt_acc}")
-
+        # check_selective_alignment(pred_source, pred_target, y_source, y_target, ot_mat)
     if config["calc_margin"]:
         std_margin, avg_margin, _, _ = calc_margin(pred_source, y_source)
         print(f"Source margin mean: {avg_margin}, std: {std_margin}")
@@ -144,6 +130,36 @@ def debug_model(
         calc_gradual_shift(
             loss_fun, pred_source, pred_target, y_source, y_target, model.num_classes
         )
+
+def check_selective_alignment(pred_source, pred_target, y_source, y_target, ot_mat):
+    y_dist = torch.cdist(y_source, y_target)
+    y_acc = (y_dist == 0).to(torch.float)
+    cost_mat = torch.cdist(pred_source, pred_target, p=2)
+    std_cost, mean_cost = torch.std_mean(cost_mat)
+    thresh = mean_cost - std_cost
+    filter_mat = cost_mat < thresh
+    filt_ent = torch.sum(ot_mat * filter_mat * y_dist) / torch.sum(
+        ot_mat * filter_mat
+    )
+    filt_acc = torch.sum(ot_mat * filter_mat * y_acc) / torch.sum(
+        ot_mat * filter_mat
+    )
+    print(f"Distance filtered entanglement/acc: {filt_ent}/{filt_acc}")
+
+    std_margin, mean_margin, margin, correct = calc_margin(pred_source, y_source)
+    thresh = mean_margin + std_margin
+    filter_vec_margin = margin > thresh
+    filt_ent = torch.sum(
+        ot_mat[correct][filter_vec_margin] * y_dist[correct][filter_vec_margin]
+    )
+    filt_ent /= torch.sum(ot_mat[correct][filter_vec_margin])
+    filt_acc = torch.sum(
+        ot_mat[correct][filter_vec_margin] * y_acc[correct][filter_vec_margin]
+    )
+    filt_acc /= torch.sum(ot_mat[correct][filter_vec_margin])
+    print(f"Margin filtered entanglement/acc: {filt_ent}/{filt_acc}")
+
+
 
 
 def calc_grad_info(model, loss_fun, fabric, pred_source, pred_target, y_source):

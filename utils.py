@@ -165,3 +165,13 @@ def calc_w_distance_label_shift(scenario):
     q_y = num_cond_target / torch.sum(num_cond_target)
     w_1_euclidean_dist = np.sqrt(2) * torch.sum(torch.abs(p_y - q_y)) / 2
     print(f"W1_distance_labels for {scenario.name} is {w_1_euclidean_dist}")
+
+
+def calc_margin(preds, labels):
+    # Get correct points with matching labels
+    # Find the gap between max and second max (by sorting for now)
+    pred_sorted_val, pred_sorted_ind = torch.sort(preds, dim=1, descending=True)
+    correct = pred_sorted_ind[:, 0] == labels.argmax(1)
+    margin = pred_sorted_val[correct, 0] - pred_sorted_val[correct, 1]
+    std_margin, mean_margin = torch.std_mean(margin)
+    return std_margin, mean_margin, margin, correct

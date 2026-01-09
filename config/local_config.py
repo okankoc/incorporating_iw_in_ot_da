@@ -12,7 +12,7 @@ def setup_local_config():
         "learning_rate": 1e-3,  # use 1e-4 for ResNets or a learning scheduler
         "momentum": 0.9,  # for SGD
         "weight_decay": 0.0,
-        "num_epochs": 1,
+        "num_epochs": 5,
         "num_runs": 1,
         "algs": [
             "wrr",
@@ -79,6 +79,10 @@ def setup_alg_config(config):
         "norm": 2,
         "entropy_reg": 1e-3,
         "print_info": False,
+        "propagate_labels": False,
+        "compute_ultrametric": False,
+        "estimate_entanglement": True,
+        "softmax_temperature": 0.1,
     }
 
     config["weighted_wrr"] = {

@@ -19,7 +19,7 @@ def compute_pseudolabels(Z, num_targets, num_classes, soft=True):
         return utils.one_hot(y_pred.T, num_classes)
 
 
-def compute_soft_cluster(source_feat, target_feat, tau_min=0.01, tau_max=0.01):
+def compute_soft_cluster(source_feat, target_feat, tau_min=0.1, tau_max=0.1):
     def soft_max(a, b, tau):
         # a: [1] or [N], b: [N]
         # returns smooth max elementwise
