@@ -41,7 +41,7 @@ class MultiLayerPerceptron(nn.Module):
         def fun(module, inputs, outputs):
             self.features = outputs
 
-        hook = self.net[layer_id].register_forward_hook(fun)
+        self.net[layer_id].register_forward_hook(fun)
 
     # In the forward compute, we store also the intermediate pre/post-activation layer features
     def forward(self, x):

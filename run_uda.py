@@ -121,8 +121,8 @@ def init_algorithm(config, name, model, loss_fun, opt, scenario, fabric):
         alg = adapt.oracle.OracleCC(config["cc"], fabric, model, loss_fun, opt)
     elif name == "erm":
         alg = adapt.erm.ERM(model, fabric, loss_fun, opt)
-    elif name == 'pseudolabel':
-        alg = adapt.Pseudolabel(config['pseudolabel'], fabric, model, loss_fun, opt)
+    elif name == "pseudolabel":
+        alg = adapt.Pseudolabel(config["pseudolabel"], fabric, model, loss_fun, opt)
     elif name == "jdot":
         alg = adapt.jdot.JDOT(config["jdot"], fabric, model, loss_fun, opt)
     elif name == "dann":

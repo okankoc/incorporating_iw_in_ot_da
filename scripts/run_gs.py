@@ -1,9 +1,8 @@
 import torch
-import numpy as np
-import ot
 import matplotlib.pyplot as plt
 
 import iter_ls
+
 
 def gen_gauss_covariates(mean, var, num_samples):
     if var.numel() == 1:
@@ -113,7 +112,13 @@ def check_gradual_shift_in_linear_classification():
 
     # Test linkage-clustering based pseudolabeler
     theta_pl, pred_target_pl = iter_ls.optim_linkage(
-        X_source, X_target, y_source, thresh=1e-2, theta0=theta_ls, method='single', soft=True
+        X_source,
+        X_target,
+        y_source,
+        thresh=1e-2,
+        theta0=theta_ls,
+        method="single",
+        soft=True,
     )
     # theta_pl, pred_target_pl = iter_ls.optim_input_linkage(X_source, X_target, y_source, method='single', soft=False)
     print(f"CE loss: {loss(pred_target_pl, y_target)}")

@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 
 import utils
 
+
 def compute_pseudolabels(Z, num_targets, num_classes, soft=True):
     coph_dists = cophenet(Z)
     # Convert to square matrix
@@ -24,25 +25,27 @@ def compute_soft_cluster(source_feat, target_feat, tau_min=0.1, tau_max=0.1):
         # a: [1] or [N], b: [N]
         # returns smooth max elementwise
         m = torch.maximum(a, b)
-        return m + tau * torch.log(torch.exp((a - m)/tau) + torch.exp((b - m)/tau))
+        return m + tau * torch.log(torch.exp((a - m) / tau) + torch.exp((b - m) / tau))
 
     def soft_min2(a, b, tau):
         # smooth min elementwise between two tensors a,b of same shape
         m = torch.minimum(a, b)
-        return m - tau * torch.log(torch.exp(-(a - m)/tau) + torch.exp(-(b - m)/tau))
+        return m - tau * torch.log(
+            torch.exp(-(a - m) / tau) + torch.exp(-(b - m) / tau)
+        )
 
     all_feat = torch.vstack((source_feat, target_feat))
     U = torch.cdist(all_feat, all_feat, p=2)  # [N,N], requires grad
 
     n = U.shape[0]
     for k in range(n):
-        U_prev = U                          # keep reference
-        U = U_prev.clone()                  # new tensor (no inplace on U_prev)
+        U_prev = U  # keep reference
+        U = U_prev.clone()  # new tensor (no inplace on U_prev)
 
         # vectorize over i for each k to avoid inner loop where possible
         # candidate[i,j] = soft_max(U_prev[i,k], U_prev[k,j])
         cand = soft_max(U_prev[:, k].unsqueeze(1), U_prev[k, :].unsqueeze(0), tau_max)
-        U = soft_min2(U, cand, tau_min)     # not inplace; creates new ops
+        U = soft_min2(U, cand, tau_min)  # not inplace; creates new ops
 
         # optional: enforce diagonal = 0 without inplace on autograd-needed tensor
         # (diagonal isn't used in your slicing anyway)
@@ -54,8 +57,6 @@ def compute_soft_cluster(source_feat, target_feat, tau_min=0.1, tau_max=0.1):
 
 @torch.no_grad()
 def compute_cluster_full(source_feat, target_feat, num_classes, method):
-    num_source = source_feat.shape[0]
-    num_targets = target_feat.shape[0]
     all_feat = torch.vstack((source_feat, target_feat))
     dist_mat = torch.cdist(all_feat, all_feat, p=2)
 
@@ -79,7 +80,7 @@ def compute_cluster(source_feat, target_feat, method):
             try:
                 dists = torch.cdist(source_feat[i], source_feat[j], p=2)
                 min_dist = torch.min(dists)
-            except:
+            except Exception:
                 min_dist = 1e3
             dist_mat[num_targets + i, num_targets + j] = min_dist
             # print(dist_mat[num_targets+i, num_targets+j])
@@ -88,7 +89,7 @@ def compute_cluster(source_feat, target_feat, method):
         try:
             dist_to_source = torch.cdist(target_feat, source_feat[i], p=2)
             min_dist_to_source, _ = torch.min(dist_to_source, dim=1)
-        except:
+        except Exception:
             min_dist_to_source = 1e3 * torch.ones(num_targets)
         # print(min_dist_to_source)
         # Expand target distances with source cond as a new node

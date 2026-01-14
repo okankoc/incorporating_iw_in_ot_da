@@ -18,7 +18,7 @@ def load_model(config, fabric, scenario):
             # Load parameters from a file
             model.load_state_dict(torch.load(save_path, weights_only=True))
             print(f"Saved model found! Loading parameters from file: {save_path}")
-        except:
+        except Exception:
             print(f"Saved model {model.name} NOT found!")
     model.train()
     if config["adapt_only_last_layer"]:
@@ -79,7 +79,7 @@ def init_resnet(size, num_inp_channels, num_classes):
         def fun(module, inputs, outputs):
             model.features = inputs[0]
 
-        hook = model.fc.register_forward_hook(fun)
+        model.fc.register_forward_hook(fun)
 
     @torch.no_grad()
     def save_params(model):
@@ -125,7 +125,7 @@ def pretrain_model(model, config, fabric, scenario, loss_fun, opt):
         model.load_state_dict(torch.load(save_path, weights_only=True))
         print(f"Saved model found! Loaded parameters from file: {save_path}")
         model = fabric.setup(model)
-    except:
+    except Exception:
         print(f"Saved model {model.name} NOT found!")
         model, opt = fabric.setup(model, opt)
         print(f"Pretraining {config['num_pretrain_epochs']} epochs...")

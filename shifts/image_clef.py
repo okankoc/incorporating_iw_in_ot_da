@@ -88,5 +88,5 @@ class IMAGECLEFDA:
                         src=os.path.join(root, folder, name),
                         dst=os.path.join(root, folder, str(elem["label"]), name),
                     )
-                except:
+                except Exception:
                     print(f"File {name} not found! Skipping...")

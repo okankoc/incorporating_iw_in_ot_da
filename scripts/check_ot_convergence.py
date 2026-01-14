@@ -9,9 +9,7 @@ and check for convergence
 """
 
 import numpy as np
-import logging
 import torch
-from torch.nn.utils import parameters_to_vector
 import geomloss
 import ot
 import matplotlib.pyplot as plt
@@ -19,7 +17,6 @@ import time
 
 import shifts
 import synthetic_shifts
-from loss import EuclideanLoss
 from models.mlp import MultiLayerPerceptron as MLP
 from sinkhorn_uot import fast_uot_sinkhorn, mm_unbalanced
 
@@ -297,9 +294,7 @@ def compare_ot_solvers():
     scenario = synthetic_shifts.RandomGaussians(
         dim=dim, num_batches=num_batches, dataloader_options=dl_options
     )
-    anal_dist = scenario.calc_anal_dist(
-        torch.eye(dim), torch.zeros(dim), calc_grad=False
-    )
+    scenario.calc_anal_dist(torch.eye(dim), torch.zeros(dim), calc_grad=False)
     start_time = time.time()
     W_distance = torch.zeros(num_batches)
     for j, (X_source, X_target) in enumerate(
@@ -346,11 +341,9 @@ def run_uot_solvers():
     scenario = synthetic_shifts.RandomGaussians(
         dim=dim, num_batches=num_batches, dataloader_options=dl_options
     )
-    ot_anal_dist = scenario.calc_anal_dist(
-        A=torch.eye(dim), b=torch.zeros(dim), calc_grad=False
-    )
+    scenario.calc_anal_dist(A=torch.eye(dim), b=torch.zeros(dim), calc_grad=False)
     gamma = 100
-    uot_anal_dist = scenario.calc_unbalanced_anal_dist(gamma, reg=1e-6)
+    scenario.calc_unbalanced_anal_dist(gamma, reg=1e-6)
 
     methods = ["mm", "sinkhorn", "fast_uot"]
     num_methods = len(methods)
@@ -432,9 +425,7 @@ def compare_gromov_wasserstein_to_ot():
     scenario = synthetic_shifts.RandomGaussians(
         dim=dim, num_batches=num_batches, dataloader_options=dl_options
     )
-    anal_dist = scenario.calc_anal_dist(
-        torch.eye(dim), torch.zeros(dim), calc_grad=False
-    )
+    scenario.calc_anal_dist(torch.eye(dim), torch.zeros(dim), calc_grad=False)
     start_time = time.time()
     W_distance = torch.zeros(num_batches)
     GW_distance = torch.zeros(num_batches)

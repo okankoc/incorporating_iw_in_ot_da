@@ -46,7 +46,7 @@ class ConvNet2(nn.Module):
         def fun(module, inputs, outputs):
             self.features = outputs
 
-        conv1_hook = self.net.get_submodule(layer_id).register_forward_hook(fun)
+        self.net.get_submodule(layer_id).register_forward_hook(fun)
 
     @torch.no_grad()
     def save_params(self):
@@ -109,7 +109,7 @@ class ConvNet(nn.Module):
         def fun(module, inputs, outputs):
             self.features = outputs
 
-        conv1_hook = self.net.get_submodule(layer_id).register_forward_hook(fun)
+        self.net.get_submodule(layer_id).register_forward_hook(fun)
 
     def forward(self, x):
         return self.net(x)
@@ -150,7 +150,7 @@ class LeNet(nn.Module):
         def fun(module, inputs, outputs):
             self.features = outputs
 
-        conv1_hook = self.net.get_submodule(layer_id).register_forward_hook(fun)
+        self.net.get_submodule(layer_id).register_forward_hook(fun)
 
     def forward(self, x):
         return self.net(x)
@@ -203,7 +203,7 @@ class SmallCNN(nn.Module):
         def fun(module, inputs, outputs):
             self.features = outputs
 
-        conv1_hook = self.net.get_submodule(layer_id).register_forward_hook(fun)
+        self.net.get_submodule(layer_id).register_forward_hook(fun)
 
 
 # Separated domain classifier into a new class

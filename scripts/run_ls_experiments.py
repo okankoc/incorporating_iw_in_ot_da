@@ -8,6 +8,7 @@ from scipy.optimize import linprog
 import matplotlib
 import matplotlib.pyplot as plt
 
+import iter_ls
 from importance_weighting import apply_importance_weighting as apply_iw
 
 matplotlib.use(backend="QtAgg", force=True)
@@ -40,56 +41,16 @@ def gen_labels(fun, x, noise_var):
     return y_noise, y_act
 
 
-def opt_wrr_rule_with_sgd(X_source, X_target, y_source, thresh, theta0=None):
-    # Optimize the Wasserstein-regularized Risk (WRR)
-    dim = X_source.shape[-1]
-    if theta0 is not None:
-        theta = theta0.clone().detach()
-    else:
-        theta = torch.zeros(dim)
-    theta.requires_grad = True
-    opt = torch.optim.Adam([theta], lr=1e-3)
-    loss = torch.nn.MSELoss()
-    num_source = X_source.shape[0]
-    num_target = X_target.shape[0]
-    w_source = torch.ones(num_source) / num_source
-    w_target = torch.ones(num_target) / num_target
-
-    prev_loss = 0.0
-    total_loss = 1.0
-    while abs(total_loss - prev_loss) > thresh:
-        prev_loss = total_loss
-        pred_source = X_source @ theta[:, torch.newaxis]
-        pred_target = X_target @ theta[:, torch.newaxis]
-        Gamma = ot.emd_1d(pred_source, pred_target)
-        # ot_dist = ot_loss(w_source, pred_source, w_target, pred_target)
-        source_loss = loss(pred_source[:, 0], y_source)
-
-        # Compute the WRR bound for squared distance
-        cost_mat = ot.utils.euclidean_distances(pred_source, pred_target, squared=True)
-        ot_dist = torch.sum(Gamma * cost_mat)
-        total_loss = source_loss + 0.5 * ot_dist
-        total_loss.backward()
-
-        print(
-            f"Total loss: {total_loss}, source loss: {source_loss}, ot dist: {ot_dist}, theta: {theta.detach().numpy()}"
-        )
-        opt.step()
-        opt.zero_grad()
-    return (theta, X_target @ theta)
-
-
 def opt_weighted_wrr_rule_iter_ls(
     X_source, X_target, y_source, thresh, epsilon, theta0=None
 ):
+    num_target = X_target.shape[0]
     dim = X_source.shape[-1]
     if theta0 is not None:
         theta = theta0
     else:
         theta = torch.zeros(dim)
     X_pq = torch.cat((X_source, X_target))
-    num_source = X_source.shape[0]
-    num_target = X_target.shape[0]
     loss_fun = torch.nn.MSELoss(reduction="none")
     prev_loss = 0.0
     total_loss = 1.0
@@ -137,60 +98,14 @@ def opt_weighted_wrr_rule_iter_ls(
     return theta, X_target @ theta, w
 
 
-def opt_wrr_rule_iter_ls(X_source, X_target, y_source, thresh, theta0=None):
-    dim = X_source.shape[-1]
-    if theta0 is not None:
-        theta = torch.clone(theta0).detach()
-    else:
-        theta = torch.zeros(dim)
-    X_pq = torch.cat((X_source, X_target))
-    num_source = X_source.shape[0]
-    num_target = X_target.shape[0]
-    loss = torch.nn.MSELoss()
-    prev_loss = 0.0
-    total_loss = 1.0
-    w_source = torch.ones(num_source) / num_source
-    w_target = torch.ones(num_target) / num_target
-    scale_bound = 0.5
-
-    while abs(total_loss - prev_loss) > thresh:
-        prev_loss = total_loss
-        pred_source = X_source @ theta
-        pred_target = X_target @ theta
-        Gamma = ot.emd_1d(pred_source, pred_target)
-        M_pq = torch.cat(
-            (
-                torch.cat((torch.diag(w_source), -Gamma), dim=1),
-                torch.cat((-Gamma.T, torch.diag(w_target)), dim=1),
-            ),
-            dim=0,
-        )
-        R = num_source * (X_pq.T @ M_pq @ X_pq) / scale_bound
-        theta = torch.linalg.solve(X_source.T @ X_source + R, X_source.T @ y_source)
-        source_loss = loss(pred_source, y_source)
-
-        # Compute the WRR bound for squared distance
-        cost_mat = ot.utils.euclidean_distances(
-            pred_source[:, torch.newaxis], pred_target[:, torch.newaxis], squared=True
-        )
-        ot_cost = torch.sum(Gamma * cost_mat)
-        total_loss = source_loss + scale_bound * ot_cost
-
-        print(
-            f"Total loss: {total_loss}, source loss: {source_loss}, ot dist: {ot_cost}, theta: {theta.detach().numpy()}"
-        )
-    return (theta, X_target @ theta)
-
-
 def opt_wrr_rule_iter_abs_dev(theta0, X_source, X_target, y_source, thresh):
     dim = len(theta0)
     # theta = theta0.clone().detach()
     theta = torch.zeros(dim)
-    X_pq = torch.cat((X_source, X_target))
     num_source = X_source.shape[0]
     num_target = X_target.shape[0]
-    w_source = torch.ones(num_source) / num_source
-    w_target = torch.ones(num_target) / num_target
+    # w_source = torch.ones(num_source) / num_source
+    # w_target = torch.ones(num_target) / num_target
     prev_loss = 0.0
     total_loss = 1.0
 
@@ -285,11 +200,11 @@ def test_that_wrr_rule_can_be_optimized_in_linear_regression():
     pred_target_ls = X_target @ theta_ls
 
     print("======== SGD ========")
-    theta_wrr_sgd, pred_target_wrr_sgd = opt_wrr_rule_with_sgd(
+    theta_wrr_sgd, pred_target_wrr_sgd = iter_ls.opt_wrr_sgd(
         X_source, X_target, y_source, thresh=1e-4, theta0=None
     )
     print("======= Iterative LS =======")
-    theta_wrr_iter_ls, pred_target_wrr_iter_ls = opt_wrr_rule_iter_ls(
+    theta_wrr_iter_ls, pred_target_wrr_iter_ls = iter_ls.opt_wrr_iter_ls(
         X_source, X_target, y_source, thresh=1e-4, theta0=None
     )
     # print("======= Iterative Absolute Deviations (L1) =======")
@@ -346,7 +261,7 @@ def test_that_dual_variables_in_OT_correspond_to_effect_of_IW():
     b /= torch.sum(b)
     p = 1
     blur = 0.001
-    ot_loss = geomloss.SamplesLoss(loss="sinkhorn", p=p, blur=blur)
+    # ot_loss = geomloss.SamplesLoss(loss="sinkhorn", p=p, blur=blur)
     # ot_cost = ot_loss(a, x, b, ot_dist)
     # ot_cost.backward()
 
@@ -398,7 +313,6 @@ def compute_weighted_wrr(
     w_source, loss_fun, pred_source, pred_target, y_source, num_iter, blur
 ):
     # loss matrix
-    num_source = pred_source.shape[0]
     num_target = pred_target.shape[0]
     w_target = torch.ones(num_target) / num_target
 
@@ -456,8 +370,6 @@ def test_that_weighted_OT_can_be_computed():
     # the W1-distance is significant
     # but the weighted distance converges to zero
     # as the number of samples increase!
-    import geomloss
-
     torch.manual_seed(1)
     dim = 2
     num_source = 60
@@ -490,7 +402,7 @@ def test_that_weighted_OT_can_be_computed():
     ot_mat /= torch.sum(ot_mat, dim=0)
     ot_mat *= q[None, :]
     # Implicitly optimized weights
-    w = torch.sum(ot_mat, dim=1)
+    # w = torch.sum(ot_mat, dim=1)
     ot_cost_alt = torch.sum(ot_mat * cost_mat)
 
     print(f"Optimized solution: {ot_cost_weighted}, explicit solution: {ot_cost_alt}")
@@ -592,7 +504,6 @@ def compare_weighted_wrr_opt_to_iw_in_linear_regression():
 
     X_source = torch.vstack((torch.ones((num_source)), x_source)).T
     theta_ls, res, _, _ = torch.linalg.lstsq(X_source, y_source)
-    pred_source_ls = X_source @ theta_ls
 
     # generate test samples
     num_target = 50

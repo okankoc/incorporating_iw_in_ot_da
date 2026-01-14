@@ -1,6 +1,5 @@
 import torch
 import numpy as np
-from scipy.spatial.distance import cdist
 import quadprog
 import sklearn.covariance
 
@@ -8,19 +7,26 @@ import sklearn.covariance
 # Learn the importance weighting assuming two distributions are gaussian
 def estimate_gauss_ratio(x_test, x_train):
     cov_est = sklearn.covariance.LedoitWolf()
-    p_gauss = lambda x, mu, S2: (
-        1 / torch.sqrt(pow(2 * torch.pi, len(x)) * torch.det(S2))
-    ) * torch.exp(-0.5 * (x - mu) @ torch.linalg.inv(S2) @ (x - mu))
+
+    def p_gauss(x, mu, S2):
+        denom = torch.sqrt(pow(2 * torch.pi, len(x)) * torch.det(S2))
+        return (1 / denom) * torch.exp(
+            -0.5 * (x - mu) @ torch.linalg.inv(S2) @ (x - mu)
+        )
+
     num_train = x_train.shape[0]
     num_test = x_test.shape[0]
-    w = torch.zeros(num_train)
     mu_test = torch.sum(x_test, dim=0) / num_test
     S2_test = torch.tensor(cov_est.fit(x_test - mu_test).covariance_).float()
     mu_train = torch.sum(x_train, dim=0) / num_train
     S2_train = torch.tensor(cov_est.fit(x_train - mu_train).covariance_).float()
 
-    p_test = lambda x: p_gauss(x, mu_test, S2_test)
-    p_train = lambda x: p_gauss(x, mu_train, S2_train)
+    def p_test(x):
+        return p_gauss(x, mu_test, S2_test)
+
+    def p_train(x):
+        return p_gauss(x, mu_train, S2_train)
+
     w_hat = torch.vmap(p_test)(x_train) / torch.vmap(p_train)(x_train)
     return w_hat
 

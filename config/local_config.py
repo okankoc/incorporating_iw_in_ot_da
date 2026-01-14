@@ -98,8 +98,8 @@ def setup_alg_config(config):
         "print_info": False,
     }
 
-    config['pseudolabel'] = {
-        'linkage': 'single',
+    config["pseudolabel"] = {
+        "linkage": "single",
     }
 
     config["jdot"] = {

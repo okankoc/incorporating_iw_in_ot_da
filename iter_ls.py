@@ -3,13 +3,15 @@ import ot
 
 import linkage
 
-def optim_linkage(X_source, X_target, y_source, thresh, theta0=None, method='single', soft=False):
+
+def optim_linkage(
+    X_source, X_target, y_source, thresh, theta0=None, method="single", soft=False
+):
     dim = X_source.shape[-1]
     if theta0 is not None:
         theta = torch.clone(theta0).detach()
     else:
         theta = torch.zeros(dim)
-    X_pq = torch.cat((X_source, X_target))
     num_source = X_source.shape[0]
     num_target = X_target.shape[0]
     loss = torch.nn.MSELoss()
@@ -29,7 +31,9 @@ def optim_linkage(X_source, X_target, y_source, thresh, theta0=None, method='sin
         target_feat = torch.hstack((pred1_target, pred2_target))[:, None]
         Z = linkage.compute_cluster(source_feat_cond, target_feat, method)
         # linkage.plot_cluster(Z, num_targets=target_feat.shape[0], num_classes=2)
-        y_pseudo = linkage.compute_pseudolabels(Z, num_targets=target_feat.shape[0], num_classes=2, soft=soft)[:, -1]
+        y_pseudo = linkage.compute_pseudolabels(
+            Z, num_targets=target_feat.shape[0], num_classes=2, soft=soft
+        )[:, -1]
         # Scale 0,1 to 1, -1
         y_pseudo = -2 * y_pseudo + 1
 
@@ -44,9 +48,7 @@ def optim_linkage(X_source, X_target, y_source, thresh, theta0=None, method='sin
 
 
 # This is just for debugging
-def optim_input_linkage(X_source, X_target, y_source, method='single', soft=False):
-    dim = X_source.shape[-1]
-    X_pq = torch.cat((X_source, X_target))
+def optim_input_linkage(X_source, X_target, y_source, method="single", soft=False):
     num_source = X_source.shape[0]
     num_target = X_target.shape[0]
     loss = torch.nn.MSELoss()
@@ -58,7 +60,9 @@ def optim_input_linkage(X_source, X_target, y_source, method='single', soft=Fals
     target_inputs = torch.vstack((x1_target, x2_target))
     Z = linkage.compute_cluster(source_cond, target_inputs, method)
     # linkage.plot_cluster(Z, num_targets=target_feat.shape[0], num_classes=2)
-    y_pseudo = linkage.compute_pseudolabels(Z, num_target, num_classes=2, soft=soft)[:, -1]
+    y_pseudo = linkage.compute_pseudolabels(Z, num_target, num_classes=2, soft=soft)[
+        :, -1
+    ]
     # Scale 0,1 to 1, -1
     y_pseudo = -2 * y_pseudo + 1
 
@@ -82,10 +86,10 @@ def optim_wrr_sgd(X_source, X_target, y_source, thresh, theta0=None):
     theta.requires_grad = True
     opt = torch.optim.Adam([theta], lr=1e-3)
     loss = torch.nn.MSELoss()
-    num_source = X_source.shape[0]
-    num_target = X_target.shape[0]
-    w_source = torch.ones(num_source) / num_source
-    w_target = torch.ones(num_target) / num_target
+    # num_source = X_source.shape[0]
+    # num_target = X_target.shape[0]
+    # w_source = torch.ones(num_source) / num_source
+    # w_target = torch.ones(num_target) / num_target
 
     prev_loss = 0.0
     total_loss = 100.0

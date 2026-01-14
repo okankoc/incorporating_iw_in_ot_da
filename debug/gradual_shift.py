@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 
 import linkage
 
+
 @torch.no_grad()
 def calc_gradual_shift(
     loss_fun, pred_source, pred_target, y_source, y_target, num_classes
@@ -16,12 +17,14 @@ def calc_gradual_shift(
         source_means[i] = torch.mean(cond, dim=0)
 
     ##### PLOT DISTANCES FROM THE SOURCE CONDITIONAL MEANS
-    cond_dist, correct_labeled = compute_cond_dist(pred_target, y_target, source_means, num_classes)
+    cond_dist, correct_labeled = compute_cond_dist(
+        pred_target, y_target, source_means, num_classes
+    )
     plot_distances(cond_dist, correct_labeled, num_classes)
     plt.show()
 
     ##### LINKAGE METHOD TO CHECK IF THERE IS GRADUAL SHIFT
-    Z = linkage.compute_cluster(pred_source_cond, pred_target, method='single')
+    Z = linkage.compute_cluster(pred_source_cond, pred_target, method="single")
     # linkage.plot_cluster(Z, num_targets, num_classes)
     y_pseudo = linkage.compute_pseudolabels(Z, num_targets, num_classes, soft=False)
     pseudo_loss = loss_fun(y_pseudo, y_target)
@@ -39,7 +42,7 @@ def compute_cond_dist(pred_target, y_target, source_means, num_classes):
     correct = {i: [] for i in range(num_classes)}
     pred_labels = pred_target.argmax(dim=1, keepdim=True)
     for i in range(num_classes):
-        mask = (torch.argmax(y_target, dim=1) == i)
+        mask = torch.argmax(y_target, dim=1) == i
         cond = pred_target[mask]
         for j in range(num_classes):
             dists[i][j].append(torch.norm(cond - source_means[j], dim=1))
@@ -53,8 +56,8 @@ def compute_cond_dist(pred_target, y_target, source_means, num_classes):
 
 
 def plot_distances(dist, correct_labeled, num_classes):
-    fig = plt.figure(figsize=(10, 8))
-    plt.title(f"Distance of target conditionals to source class mean")
+    plt.figure(figsize=(10, 8))
+    plt.title("Distance of target conditionals to source class mean")
     for i in range(num_classes):
         sort_dist, sort_idx = torch.sort(dist[i][i], descending=False)
         sizes = [50 if value == 0 else 10 for value in correct_labeled[i][sort_idx]]

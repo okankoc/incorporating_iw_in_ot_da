@@ -131,6 +131,7 @@ def debug_model(
             loss_fun, pred_source, pred_target, y_source, y_target, model.num_classes
         )
 
+
 def check_selective_alignment(pred_source, pred_target, y_source, y_target, ot_mat):
     y_dist = torch.cdist(y_source, y_target)
     y_acc = (y_dist == 0).to(torch.float)
@@ -138,12 +139,8 @@ def check_selective_alignment(pred_source, pred_target, y_source, y_target, ot_m
     std_cost, mean_cost = torch.std_mean(cost_mat)
     thresh = mean_cost - std_cost
     filter_mat = cost_mat < thresh
-    filt_ent = torch.sum(ot_mat * filter_mat * y_dist) / torch.sum(
-        ot_mat * filter_mat
-    )
-    filt_acc = torch.sum(ot_mat * filter_mat * y_acc) / torch.sum(
-        ot_mat * filter_mat
-    )
+    filt_ent = torch.sum(ot_mat * filter_mat * y_dist) / torch.sum(ot_mat * filter_mat)
+    filt_acc = torch.sum(ot_mat * filter_mat * y_acc) / torch.sum(ot_mat * filter_mat)
     print(f"Distance filtered entanglement/acc: {filt_ent}/{filt_acc}")
 
     std_margin, mean_margin, margin, correct = calc_margin(pred_source, y_source)
@@ -158,8 +155,6 @@ def check_selective_alignment(pred_source, pred_target, y_source, y_target, ot_m
     )
     filt_acc /= torch.sum(ot_mat[correct][filter_vec_margin])
     print(f"Margin filtered entanglement/acc: {filt_ent}/{filt_acc}")
-
-
 
 
 def calc_grad_info(model, loss_fun, fabric, pred_source, pred_target, y_source):
@@ -228,9 +223,10 @@ def calc_margin(preds, labels):
     return std_margin, mean_margin, margin, correct
 
 
-def calc_weighted_wrr(model, fabric, loss_fun, f_source, f_target, y_source, reg):
+def calc_weighted_wrr(
+    model, fabric, loss_fun, f_source, f_target, y_source, reg, method="mm"
+):
     num_target = f_target.shape[0]
-    source_loss = loss_fun(f_source, y_source)
     # loss matrix
     w_target = torch.ones(num_target, device=fabric.device) / num_target
     cost_mat = torch.cdist(f_source, f_target, 2)
@@ -241,12 +237,15 @@ def calc_weighted_wrr(model, fabric, loss_fun, f_source, f_target, y_source, reg
     num_source = y_source.shape[0]
     w_source = torch.ones(num_source, device=fabric.device) / num_source
     reg_m = (1.0, 100.0)
-    # ot_mat = ot.sinkhorn_unbalanced(
-    #     w_source, w_target, cost_mat, reg, reg_m, method="sinkhorn_stabilized"
-    # )
-    ot_mat = ot.unbalanced.mm_unbalanced(
-        w_source, w_target, cost_mat, reg_m, div="kl", numItermax=1000
-    )
+    if method == "mm":
+        ot_mat = ot.unbalanced.mm_unbalanced(
+            w_source, w_target, cost_mat, reg_m, div="kl", numItermax=1000
+        )
+    else:
+        print("Using sinkhorn unbalanced...")
+        ot_mat = ot.sinkhorn_unbalanced(
+            w_source, w_target, cost_mat, reg, reg_m, method="sinkhorn_stabilized"
+        )
 
     loss = torch.sum(ot_mat * cost_mat)
     w_source = torch.sum(ot_mat, dim=1)
@@ -254,21 +253,21 @@ def calc_weighted_wrr(model, fabric, loss_fun, f_source, f_target, y_source, reg
     return loss, ot_mat, w_source, w_source_loss
 
 
-def calc_ot(f_source, f_target, fabric, reg=1e-6):
+def calc_ot(f_source, f_target, fabric, reg=1e-6, use_geomloss=False):
     num_source = f_source.shape[0]
     num_target = f_target.shape[0]
 
     ### Geomloss
-    # ot_loss = geomloss.SamplesLoss(loss="sinkhorn", p=1, blur=reg)
-    # cost = ot_loss(f_source, f_target)
-
-    # The problem with using POT is that Sinkhorn is not converging for low reg.
-    # and it doesn't seem possible to get a numerically accurate ot_mat from geomloss!
-    w_source = torch.ones(num_source, device=fabric.device) / num_source
-    num_target = f_target.shape[0]
-    w_target = torch.ones(num_target, device=fabric.device) / num_target
-    cost_mat = torch.cdist(f_source, f_target, p=2)
-    ot_mat = ot.emd(w_source, w_target, cost_mat, numItermax=5000)
-    cost = torch.sum(ot_mat * cost_mat)
-
+    if use_geomloss is True:
+        ot_loss = geomloss.SamplesLoss(loss="sinkhorn", p=1, blur=reg)
+        cost = ot_loss(f_source, f_target)
+    else:
+        # The problem with using POT is that Sinkhorn is not converging for low reg.
+        # and it doesn't seem possible to get a numerically accurate ot_mat from geomloss!
+        w_source = torch.ones(num_source, device=fabric.device) / num_source
+        num_target = f_target.shape[0]
+        w_target = torch.ones(num_target, device=fabric.device) / num_target
+        cost_mat = torch.cdist(f_source, f_target, p=2)
+        ot_mat = ot.emd(w_source, w_target, cost_mat, numItermax=5000)
+        cost = torch.sum(ot_mat * cost_mat)
     return cost, ot_mat

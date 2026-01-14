@@ -31,7 +31,7 @@ class ProbModel(nn.Module):
             layer.bias.data[:old_dim_out] = old_bias
             self.net.append(layer)
             self.num_features = old_dim_out
-        except:
+        except Exception:
             print("Creating a probabilistic ResNet")
             # ResNets only have one fully connected layer at the end
             # so we need to add another one
