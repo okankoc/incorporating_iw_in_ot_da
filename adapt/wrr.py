@@ -86,6 +86,7 @@ class WRR:
         if self.propagate_labels is True:
             reg_loss = self.propagate_label(pred_source, pred_target, y_source, fabric)
         elif self.compute_ultrametric is True:
+            breakpoint()
             ultra_dist_mat = linkage.compute_soft_cluster(pred_source, pred_target)
             w_source = torch.ones(num_source, device=fabric.device) / num_source
             w_target = torch.ones(num_target, device=fabric.device) / num_target
@@ -129,6 +130,3 @@ class WRR:
             print(
                 f"WRR: {total_loss.item()}, reg_loss: {reg_loss.item()}, source_loss: {source_loss.item()}"
             )
-
-    def validate(self, model, fabric, X_source, y_source, X_target):
-        pass

@@ -96,7 +96,3 @@ class WeightedWRR:
             print(
                 f"W-WRR: {loss.item()}, w_ot_cost: {w_ot_cost.item()}, w_source_loss: {w_source_loss.item()}"
             )
-
-    @torch.no_grad()
-    def validate(self, model, fabric, X_source, y_source, X_target):
-        pass

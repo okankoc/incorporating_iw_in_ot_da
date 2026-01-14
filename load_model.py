@@ -21,11 +21,6 @@ def load_model(config, fabric, scenario):
         except Exception:
             print(f"Saved model {model.name} NOT found!")
     model.train()
-    if config["adapt_only_last_layer"]:
-        num_layers = len(list(model.parameters()))
-        for i, p in enumerate(model.parameters()):
-            if i < num_layers - 1:
-                p.requires_grad = False
     return model
 
 

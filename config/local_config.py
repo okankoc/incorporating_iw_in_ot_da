@@ -7,29 +7,30 @@ def setup_local_config():
         "resnet_size": 18,  # 18 or 50
         "pretrain": True,
         "num_pretrain_epochs": 3,  # if pretrain is True
-        "loss": "euclidean",  # 'margin', 'euclidean', 'cross-entropy'
+        "loss": "margin",  # 'margin', 'euclidean', 'cross-entropy'
         "optimizer": "adam",  # alternatives: adam, sgd
         "learning_rate": 1e-3,  # use 1e-4 for ResNets or a learning scheduler
         "momentum": 0.9,  # for SGD
         "weight_decay": 0.0,
-        "num_epochs": 5,
+        "num_epochs": 1,
         "num_runs": 1,
         "algs": [
             "wrr",
         ],  # wrr, weighted_wrr, cons_wrr, jdot, lje, erm, cc, dann, fdal, reverse-kl
         # Debugging algorithms
         "debug": True,
-        "debug_every_n": 10,
+        "debug_every_n": 50,
         "n_batches_per_epoch": -1,  # if -1 uses all batches
         "report_source_train_risk": False,
         "report_target_train_risk": False,
         "pretrain_on_both": False,  # starting from a model that 'cheats'!
-        "adapt_only_last_layer": False,
-        "checkpoint": False,
-        "validate": True,
     }
 
     scenario_config = {
+        # Distribution shift scenario
+        # MNIST_TO_USPS, USPS_TO_MNIST, MNIST_TO_MNIST_M, SVHN_TO_MNIST,
+        # CIFAR-10-C, PORTRAITS, OFFICE_31, OFFICEHOME, IMAGECLEFDA, VISDA17
+        "scenario": "MNIST_TO_USPS",
         # Enable only when running a dataset for the first-time
         "preprocess": False,
         # Data loader options
@@ -37,6 +38,7 @@ def setup_local_config():
         # Test set dataloader options
         "test_batch_size": 512,
         "shuffle": True,
+        # Dataset-specific settings
         "cifar-10-corruptions": ["fog", "frost", "snow"],
         "portraits-size": [186, 171],
         "portraits-grayscale": False,
@@ -47,21 +49,17 @@ def setup_local_config():
         "imageclef-size": [300, 300],
         "imageclef-target": "pascal",  # 'bing', 'caltech', 'imagenet', 'pascal'
         "visda17-size": [384, 216],
-        # Distribution shift scenario
-        # MNIST_TO_USPS, USPS_TO_MNIST, MNIST_TO_MNIST_M, SVHN_TO_MNIST,
-        # CIFAR-10-C, PORTRAITS, OFFICE_31, OFFICEHOME, IMAGECLEFDA, VISDA17
-        "scenario": "MNIST_TO_USPS",
     }
 
     debug_config = {
         "calc_label_shift": False,
-        "calc_entanglement": True,
-        "calc_margin": False,
+        "calc_entanglement": False,
+        "calc_margin": True,
         "calc_wrr": True,
         "calc_weighted_wrr": True,
         "verbose_weighted_wrr": False,
         "calc_weight_info": False,
-        "calc_grad_info": False,
+        "calc_grad_info": True,
         "calc_gradual_shift": False,
     }
 
@@ -81,7 +79,7 @@ def setup_alg_config(config):
         "print_info": False,
         "propagate_labels": False,
         "compute_ultrametric": False,
-        "estimate_entanglement": True,
+        "estimate_entanglement": False,
         "softmax_temperature": 0.1,
     }
 

@@ -21,9 +21,6 @@ class OracleLJE:
         self.opt.step()
         self.opt.zero_grad()
 
-    def validate(self, model, fabric, X_source, y_source, X_target):
-        pass
-
 
 class OracleCC:
     def __init__(self, config, fabric, model, loss_fun, opt):
@@ -105,6 +102,3 @@ class OracleCC:
         ot_loss = geomloss.SamplesLoss("sinkhorn", p=self.p, blur=self.reg)
         w_dist = ot_loss(x_source, x_target)
         return w_dist
-
-    def validate(self, model, fabric, X_source, y_source, X_target):
-        pass

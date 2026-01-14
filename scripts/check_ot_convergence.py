@@ -445,12 +445,23 @@ def compare_gromov_wasserstein_to_ot():
     print(f"Avg gw_distance: {torch.mean(GW_distance)}")
 
 
+def check_procrustes_alignment():
+    from scipy.spatial import procrustes
+
+    a = np.array([[1, 3], [1, 2], [1, 1], [2, 1]], 'd')
+    b = np.array([[4, -2], [4, -4], [4, -6], [2, -6]], 'd')
+    mtx1, mtx2, disparity = procrustes(a, b)
+    round(disparity)
+    print(mtx1, mtx2)
+
+
 if __name__ == "__main__":
     # logging.getLogger("torch._dynamo").setLevel(logging.ERROR)
     # logging.getLogger("torch._inductor").setLevel(logging.ERROR)
 
+    check_procrustes_alignment()
     # compare_gromov_wasserstein_to_ot()
     # run_uot_solvers()
     # compare_ot_solvers()
-    check_gaussians()
+    # check_gaussians()
     # check_mnist_to_usps()

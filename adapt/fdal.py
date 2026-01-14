@@ -48,6 +48,3 @@ class FDAL:
         torch.nn.utils.clip_grad_norm(self.learner.parameters(), self.clip_grad_val)
         self.opt.step()
         # print(f"Task loss: {stats["taskloss"]}, fdal loss: {stats["fdal_loss"]}")
-
-    def validate(self, model, fabric, X_source, y_source, X_target):
-        pass

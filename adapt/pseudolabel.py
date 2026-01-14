@@ -32,6 +32,3 @@ class Pseudolabel:
         loss = source_loss + pseudo_target_loss
         fabric.backward(loss)
         self.opt.step()
-
-    def validate(self, model, fabric, X_source, y_source, X_target):
-        pass

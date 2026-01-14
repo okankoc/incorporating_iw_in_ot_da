@@ -83,6 +83,3 @@ class JDOT:
             num_source, num_target
         )
         return loss_mat
-
-    def validate(self, model, fabric, X_source, y_source, X_target):
-        pass

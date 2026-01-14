@@ -35,6 +35,3 @@ class MMD:
         for gamma in self.gammas:
             kernel_mat += torch.exp(-gamma * mat_dist)
         return kernel_mat
-
-    def validate(self, model, fabric, X_source, y_source, X_target):
-        pass

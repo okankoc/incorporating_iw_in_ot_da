@@ -11,7 +11,7 @@ import utils
 import adapt
 import loss
 import shifts
-from debug.debug import debug_method
+from debug.debug import Debugger
 from config.local_config import setup_local_config
 from config.cluster_config import setup_cluster_config
 from load_model import load_model, init_model, pretrain_model
@@ -162,13 +162,7 @@ def report_init_performance(config, model, scenario, loss_fun, fabric):
     return results
 
 
-def run_uda(config, fabric):
-    methods = config["algs"]
-    num_methods = len(methods)
-    num_epochs = config["num_epochs"]
-    num_runs = config["num_runs"]
-
-    # Run adaptation
+def setup_uda(config, fabric):
     scenario = init_scenario(config["scenario_options"], fabric)
     model = init_model(config, scenario)
     scenario = setup_fabric_dataloaders(fabric, scenario)
@@ -179,10 +173,21 @@ def run_uda(config, fabric):
     else:
         model = fabric.setup(model)
     results = report_init_performance(config, model, scenario, loss_fun, fabric)
+    return scenario, model, loss_fun, results
 
+
+def run_uda(config, fabric):
+    methods = config["algs"]
+    num_methods = len(methods)
+    num_epochs = config["num_epochs"]
+    num_runs = config["num_runs"]
+    scenario, model, loss_fun, results = setup_uda(config, fabric)
+
+    # Run adaptation
     for i in range(num_methods):
         for j in range(num_runs):
             reset_all(seed=j)
+            debugger = Debugger(scenario)
             model = load_model(config, fabric, scenario)
             loss_fun = init_loss(config)
             opt = init_opt(config, model)
@@ -200,20 +205,19 @@ def run_uda(config, fabric):
                 ):
                     y_train = utils.one_hot(y_train, scenario.num_classes)
                     y_shift = utils.one_hot(y_shift, scenario.num_classes)
+                    alg.adapt(model, fabric, X_train, y_train, X_shift, y_shift)
+
                     if batch_idx % 10 == 0:
                         print(f"Batch id: {batch_idx}")
-                    alg.adapt(model, fabric, X_train, y_train, X_shift, y_shift)
                     if config["debug"] is True and (
                         batch_idx % config["debug_every_n"] == 0
                     ):
-                        debug_method(
+                        debugger.calc_metrics(
                             config,
-                            alg,
                             model,
                             loss_fun,
                             scenario,
-                            fabric,
-                            batch_idx / config["debug_every_n"],
+                            fabric
                         )
                     batch_idx += 1
                     if (
@@ -233,6 +237,7 @@ def run_uda(config, fabric):
                     config["report_target_train_risk"],
                     fabric,
                 )
+            debugger.save_metrics_plot()
     return results
 
 

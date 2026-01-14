@@ -12,6 +12,3 @@ class ERM:
         fabric.backward(loss)
         self.opt.step()
         self.opt.zero_grad()
-
-    def validate(self, model, fabric, X_source, y_source, X_target):
-        pass

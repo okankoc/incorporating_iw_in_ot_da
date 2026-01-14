@@ -93,6 +93,3 @@ class DANN(nn.Module):
         self.opt.step()
         self.opt.zero_grad()
         self.idx += 1
-
-    def validate(self, model, fabric, X_train, y_train, X_shift):
-        pass

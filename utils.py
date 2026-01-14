@@ -2,7 +2,29 @@ import os
 import time
 import torch
 import numpy as np
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
+
+
+class ForeverDataIterator:
+    """A data iterator that will never stop producing data.
+    Taken from fDAL code (MIT License): https://github.com/nv-tlabs/fdal,
+    who also took it from somewhere else it seems. """
+
+    def __init__(self, data_loader: DataLoader):
+        self.data_loader = data_loader
+        self.iter = iter(self.data_loader)
+
+    def __next__(self):
+        try:
+            data = next(self.iter)
+        except StopIteration:
+            self.iter = iter(self.data_loader)
+            data = next(self.iter)
+        return data
+
+    def __len__(self):
+        return len(self.data_loader)
+
 
 
 class GenericDataset(Dataset):

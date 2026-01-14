@@ -1,121 +1,117 @@
+import os
 import torch
 import ot
 import geomloss
 import numpy as np
+import matplotlib.pyplot as plt
 
 import utils
 from debug.gradual_shift import calc_gradual_shift
 
 
-def debug_method(config, method, model, loss_fun, scenario, fabric, idx_des):
-    num_batches = len(scenario.source_test_dataloader)
-    idx_des = idx_des % num_batches
-    idx = 0
-    for (X_train, y_train), (X_shift, y_shift) in zip(
-        scenario.source_test_dataloader, scenario.target_test_dataloader
-    ):
-        if idx == idx_des:
-            print("============================================")
-            print(f"Debugging/validating on {idx}'th test batch")
-            y_train = utils.one_hot(y_train, scenario.num_classes)
-            y_shift = utils.one_hot(y_shift, scenario.num_classes)
-            debug_model(
-                config["debug_options"],
-                model,
-                loss_fun,
-                fabric,
-                X_train,
-                y_train,
-                X_shift,
-                y_shift,
-            )
-            if config["validate"] is True:
-                method.validate(model, fabric, X_train, y_train, X_shift)
-            break
-            print("============================================")
-        idx += 1
+class Debugger:
+    def __init__(self, scenario):
+        self.source_dl = utils.ForeverDataIterator(scenario.source_test_dataloader)
+        self.target_dl = utils.ForeverDataIterator(scenario.target_test_dataloader)
+        margin_dict = {'source': {'mean': [], 'std': []}, 'target': {'mean': [], 'std': []}}
+        grad_dict = {'source_norm': [], 'ot_norm': [], 'angle': []}
+        self.metrics = {'target_loss': [], 'wrr': [], 'w2r2': [],
+                        'margin': margin_dict, 'grad': grad_dict}
+
+    def calc_metrics(self, config, model, loss_fun, scenario, fabric):
+        X_train, y_train = next(self.source_dl)
+        X_shift, y_shift = next(self.target_dl)
+        print("============================================")
+        print(f"Debugging/validating on test batch")
+        y_train = utils.one_hot(y_train, scenario.num_classes)
+        y_shift = utils.one_hot(y_shift, scenario.num_classes)
+        debug_model(
+            config["debug_options"],
+            model,
+            loss_fun,
+            fabric,
+            X_train,
+            y_train,
+            X_shift,
+            y_shift,
+            self.metrics,
+        )
+        print("============================================")
+
+
+    # Assuming only one algorithm and one run
+    def save_metrics_plot(self):
+        num_batches = len(self.metrics['wrr'])
+        folder_name = os.path.join("results", "debug")
+        os.makedirs(folder_name, exist_ok=True)
+        fig, ax = plt.subplots()
+        ax.plot(np.arange(num_batches), np.array(self.metrics['target_loss']), label='target_loss')
+        ax.plot(np.arange(num_batches), np.array(self.metrics['wrr']), label='wrr')
+        ax.plot(np.arange(num_batches), np.array(self.metrics['w2r2']), label='weighted_wrr')
+        ax.legend(loc="lower right")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        plt.savefig(os.path.join(folder_name, "wrr_test_vals.pdf"), format="pdf")
+
+        # Saving margin and target loss in a separate plot
+        fig, ax = plt.subplots()
+        ax.plot(np.arange(num_batches), np.array(self.metrics['target_loss']), label='target_loss')
+        ax.errorbar(x=np.arange(num_batches), y=self.metrics['margin']['source']['mean'], yerr=self.metrics['margin']['source']['std'], label='source_margin')
+        ax.errorbar(x=np.arange(num_batches), y=self.metrics['margin']['target']['mean'], yerr=self.metrics['margin']['target']['std'], label='target_margin')
+        ax.legend(loc="lower right")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        plt.savefig(os.path.join(folder_name, "margin_test_vals.pdf"), format="pdf")
+
+        # Saving gradient norms and target loss in a separate plot
+        fig, ax = plt.subplots()
+        ax.plot(np.arange(num_batches), np.array(self.metrics['target_loss']), label='target_loss')
+        ax.plot(np.arange(num_batches), np.array(self.metrics['grad']['source_norm']), label='source_grad_norm')
+        ax.plot(np.arange(num_batches), np.array(self.metrics['grad']['ot_norm']), label='ot_grad_norm')
+        ax.plot(np.arange(num_batches), np.array(self.metrics['grad']['angle']), label='grad_angle')
+        ax.legend(loc="lower right")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        plt.savefig(os.path.join(folder_name, "grad_test_vals.pdf"), format="pdf")
 
 
 # Debugging by printing Wasserstein-based bounds for all methods!
 def debug_model(
-    config, model, loss_fun, fabric, X_source, y_source, X_target, y_target
+    config, model, loss_fun, fabric, X_source, y_source, X_target, y_target, metrics
 ):
     pred_source = model(X_source)
     pred_target = model(X_target)
     target_loss = loss_fun(pred_target, y_target)
+    metrics['target_loss'].append(target_loss.item())
     print(f"target_loss: {target_loss.item()}")
     if config["calc_wrr"]:
         source_loss = loss_fun(pred_source, y_source)
         ot_cost, ot_mat = calc_ot(pred_source, pred_target, fabric)
         wrr = source_loss + ot_cost
+        metrics['wrr'].append(wrr.item())
         print(
             f"WRR: {wrr.item()}, ot_cost: {ot_cost.item()}, source_loss: {source_loss.item()}"
         )
     if config["calc_weighted_wrr"]:
-        w_wrr, w_ot_mat, w_source, w_source_loss = calc_weighted_wrr(
-            model, fabric, loss_fun, pred_source, pred_target, y_source, reg=1e-1
-        )
-        w_ot_cost = w_wrr - w_source_loss
-        print(
-            f"W-WRR: {w_wrr.item()}, w_ot_cost: {w_ot_cost.item()}, w_source_loss: {w_source_loss.item()}"
-        )
-
-        # Get the top 5 weights
-        if config["verbose_weighted_wrr"]:
-            vals, w_idx = torch.sort(w_source, descending=True)
-            source_losses = loss_fun(pred_source, y_source, reduction="none")
-            num_select = 5
-            print(
-                f"Top {num_select} source weights: {vals[:num_select].detach().numpy()}, with total weight: {torch.sum(vals[:num_select])}"
-            )
-            print(
-                f"Their labels: {torch.argmax(y_source[w_idx[:num_select]], dim=1).detach().numpy()}"
-            )
-            print(f"Their losses: {source_losses[w_idx[:num_select]].detach().numpy()}")
-            # Print their labels + num of points in batch with same label
-            num_source = y_source.shape[0]
-            print(
-                f"Num of label proportions in batch: {(torch.sum(y_source, dim=0) / num_source).detach().numpy()}"
-            )
-            print(
-                f"Average loss per label: {torch.sum(source_losses[:, None] * y_source, dim=0) / torch.sum(y_source, dim=0)}"
-            )
-            y_preds = torch.argmax(pred_target, dim=1)
-            y_preds_hot = utils.one_hot(y_preds, model.num_classes)
-            num_target = pred_target.shape[0]
-            print(
-                f"Num of predicted target class proportions in batch: {(torch.sum(y_preds_hot, dim=0) / num_target).detach().numpy()}"
-            )
-
+        w_wrr = debug_weighted_wrr(config, model, fabric, loss_fun, pred_source, pred_target, y_source)
+        metrics['w2r2'].append(w_wrr.item())
     if config["calc_entanglement"]:
-        y_dist = torch.cdist(y_source, y_target)
-        entanglement = torch.sum(ot_mat * y_dist)
-        print(f"Entanglement: {entanglement}")
-        y_acc = (y_dist == 0).to(torch.float)
-        print(f"OT acc: {torch.sum(ot_mat * y_acc)}")
-        # weighted_entanglement = torch.sum(w_ot_mat * y_dist)
-        # print(f"Weighted entanglement: {weighted_entanglement}")
-        # print(f"Weighted OT acc: {torch.sum(w_ot_mat * y_acc)}")
-
-        # Check entanglement of ultrametric-based coupling
-        # import linkage
-        # num_source, num_target = pred_source.shape[0], pred_target.shape[0]
-        # ultra_dist_mat = linkage.compute_soft_cluster(pred_source, pred_target)
-        # w_source = torch.ones(num_source, device=fabric.device) / num_source
-        # w_target = torch.ones(num_target, device=fabric.device) / num_target
-        # ultra_ot_mat = ot.emd(w_source, w_target, ultra_dist_mat, numItermax=5000)
-        # ultra_entanglement = torch.sum(ultra_ot_mat * y_dist)
-        # print(f"Ultrametric-OT entanglement: {ultra_entanglement}")
-
-        # Check entanglement/accuracy of selective alignment
-        # check_selective_alignment(pred_source, pred_target, y_source, y_target, ot_mat)
+        calc_entanglement(y_source, y_target, ot_mat)
     if config["calc_margin"]:
         std_margin, avg_margin, _, _ = calc_margin(pred_source, y_source)
+        metrics['margin']['source']['mean'].append(avg_margin.item())
+        metrics['margin']['source']['std'].append(std_margin.item())
         print(f"Source margin mean: {avg_margin}, std: {std_margin}")
         std_margin, avg_margin, _, _ = calc_margin(pred_target, y_target)
         print(f"Target margin mean: {avg_margin}, std: {std_margin}")
+        metrics['margin']['target']['mean'].append(avg_margin.item())
+        metrics['margin']['target']['std'].append(std_margin.item())
     if config["calc_grad_info"]:
-        calc_grad_info(model, loss_fun, fabric, pred_source, pred_target, y_source)
+        mean_source_grad_norm, mean_ot_grad_norm, mean_angle = calc_grad_info(model, loss_fun, fabric, pred_source,
+                                                                              pred_target, y_source)
+        metrics['grad']['source_norm'].append(mean_source_grad_norm.item())
+        metrics['grad']['ot_norm'].append(mean_ot_grad_norm.item())
+        metrics['grad']['angle'].append(mean_angle.item())
     if config["calc_weight_info"]:
         weight_norms = []
         for name, param in model.named_parameters():
@@ -130,6 +126,68 @@ def debug_model(
         calc_gradual_shift(
             loss_fun, pred_source, pred_target, y_source, y_target, model.num_classes
         )
+
+
+def debug_weighted_wrr(config, model, fabric, loss_fun, pred_source, pred_target, y_source):
+    w_wrr, w_ot_mat, w_source, w_source_loss = calc_weighted_wrr(
+        model, fabric, loss_fun, pred_source, pred_target, y_source, reg=1e-1
+    )
+    w_ot_cost = w_wrr - w_source_loss
+    print(
+        f"W-WRR: {w_wrr.item()}, w_ot_cost: {w_ot_cost.item()}, w_source_loss: {w_source_loss.item()}"
+    )
+
+    # Get the top 5 weights
+    if config["verbose_weighted_wrr"]:
+        vals, w_idx = torch.sort(w_source, descending=True)
+        source_losses = loss_fun(pred_source, y_source, reduction="none")
+        num_select = 5
+        print(
+            f"Top {num_select} source weights: {vals[:num_select].detach().numpy()}, with total weight: {torch.sum(vals[:num_select])}"
+        )
+        print(
+            f"Their labels: {torch.argmax(y_source[w_idx[:num_select]], dim=1).detach().numpy()}"
+        )
+        print(f"Their losses: {source_losses[w_idx[:num_select]].detach().numpy()}")
+        # Print their labels + num of points in batch with same label
+        num_source = y_source.shape[0]
+        print(
+            f"Num of label proportions in batch: {(torch.sum(y_source, dim=0) / num_source).detach().numpy()}"
+        )
+        print(
+            f"Average loss per label: {torch.sum(source_losses[:, None] * y_source, dim=0) / torch.sum(y_source, dim=0)}"
+        )
+        y_preds = torch.argmax(pred_target, dim=1)
+        y_preds_hot = utils.one_hot(y_preds, model.num_classes)
+        num_target = pred_target.shape[0]
+        print(
+            f"Num of predicted target class proportions in batch: {(torch.sum(y_preds_hot, dim=0) / num_target).detach().numpy()}"
+        )
+    return w_wrr
+
+
+def calc_entanglement(y_source, y_target, ot_mat):
+    y_dist = torch.cdist(y_source, y_target)
+    entanglement = torch.sum(ot_mat * y_dist)
+    print(f"Entanglement: {entanglement}")
+    y_acc = (y_dist == 0).to(torch.float)
+    print(f"OT acc: {torch.sum(ot_mat * y_acc)}")
+    # weighted_entanglement = torch.sum(w_ot_mat * y_dist)
+    # print(f"Weighted entanglement: {weighted_entanglement}")
+    # print(f"Weighted OT acc: {torch.sum(w_ot_mat * y_acc)}")
+
+    # Check entanglement of ultrametric-based coupling
+    # import linkage
+    # num_source, num_target = pred_source.shape[0], pred_target.shape[0]
+    # ultra_dist_mat = linkage.compute_soft_cluster(pred_source, pred_target)
+    # w_source = torch.ones(num_source, device=fabric.device) / num_source
+    # w_target = torch.ones(num_target, device=fabric.device) / num_target
+    # ultra_ot_mat = ot.emd(w_source, w_target, ultra_dist_mat, numItermax=5000)
+    # ultra_entanglement = torch.sum(ultra_ot_mat * y_dist)
+    # print(f"Ultrametric-OT entanglement: {ultra_entanglement}")
+
+    # Check entanglement/accuracy of selective alignment
+    # check_selective_alignment(pred_source, pred_target, y_source, y_target, ot_mat)
 
 
 def check_selective_alignment(pred_source, pred_target, y_source, y_target, ot_mat):
@@ -189,8 +247,10 @@ def calc_grad_info(model, loss_fun, fabric, pred_source, pred_target, y_source):
                 ).item()
             )
             idx += 1
+    mean_source_grad_norm = np.mean(grad_source_norms)
+    mean_ot_grad_norm = np.mean(grad_ot_norms)
     print(
-        f"Grad norms avg. (source/OT/WRR): {np.mean(grad_source_norms)}/{np.mean(grad_ot_norms)}/{np.mean(grad_total_norms)}"
+        f"Grad norms avg. (source/OT/WRR): {mean_source_grad_norm}/{mean_ot_grad_norm}/{np.mean(grad_total_norms)}"
     )
 
     angles = torch.zeros(len(grad_total_norms))
@@ -199,7 +259,9 @@ def calc_grad_info(model, loss_fun, fabric, pred_source, pred_target, y_source):
             grad_source_norms[i] * grad_ot_norms[i]
         )
         angles[i] = torch.acos(inner_prod)
-    print(f"Avg. angle between grads : {torch.mean(angles) * 180.0 / torch.pi}")
+    mean_angle = torch.mean(angles)
+    print(f"Avg. angle between grads : {mean_angle * 180.0 / torch.pi}")
+    return mean_source_grad_norm, mean_ot_grad_norm, mean_angle
 
 
 # Assuming Euclidean distance is to be used for W_{1,l} computation,
