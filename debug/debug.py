@@ -40,39 +40,45 @@ class Debugger:
 
 
     # Assuming only one algorithm and one run
-    def save_metrics_plot(self):
+    def save_metrics_plot(self, config):
         num_batches = len(self.metrics['wrr'])
         folder_name = os.path.join("results", "debug")
         os.makedirs(folder_name, exist_ok=True)
+
+        # Saving WRR and weighted WRR values together with target loss in a separate plot
         fig, ax = plt.subplots()
         ax.plot(np.arange(num_batches), np.array(self.metrics['target_loss']), label='target_loss')
-        ax.plot(np.arange(num_batches), np.array(self.metrics['wrr']), label='wrr')
-        ax.plot(np.arange(num_batches), np.array(self.metrics['w2r2']), label='weighted_wrr')
+        if config['calc_wrr'] is True:
+            ax.plot(np.arange(num_batches), np.array(self.metrics['wrr']), label='wrr')
+        if config['calc_weighted_wrr'] is True:
+            ax.plot(np.arange(num_batches), np.array(self.metrics['w2r2']), label='weighted_wrr')
         ax.legend(loc="lower right")
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         plt.savefig(os.path.join(folder_name, "wrr_test_vals.pdf"), format="pdf")
 
         # Saving margin and target loss in a separate plot
-        fig, ax = plt.subplots()
-        ax.plot(np.arange(num_batches), np.array(self.metrics['target_loss']), label='target_loss')
-        ax.errorbar(x=np.arange(num_batches), y=self.metrics['margin']['source']['mean'], yerr=self.metrics['margin']['source']['std'], label='source_margin')
-        ax.errorbar(x=np.arange(num_batches), y=self.metrics['margin']['target']['mean'], yerr=self.metrics['margin']['target']['std'], label='target_margin')
-        ax.legend(loc="lower right")
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        plt.savefig(os.path.join(folder_name, "margin_test_vals.pdf"), format="pdf")
+        if config['calc_margin'] is True:
+            fig, ax = plt.subplots()
+            ax.plot(np.arange(num_batches), np.array(self.metrics['target_loss']), label='target_loss')
+            ax.errorbar(x=np.arange(num_batches), y=self.metrics['margin']['source']['mean'], yerr=self.metrics['margin']['source']['std'], label='source_margin')
+            ax.errorbar(x=np.arange(num_batches), y=self.metrics['margin']['target']['mean'], yerr=self.metrics['margin']['target']['std'], label='target_margin')
+            ax.legend(loc="lower right")
+            ax.spines["top"].set_visible(False)
+            ax.spines["right"].set_visible(False)
+            plt.savefig(os.path.join(folder_name, "margin_test_vals.pdf"), format="pdf")
 
         # Saving gradient norms and target loss in a separate plot
-        fig, ax = plt.subplots()
-        ax.plot(np.arange(num_batches), np.array(self.metrics['target_loss']), label='target_loss')
-        ax.plot(np.arange(num_batches), np.array(self.metrics['grad']['source_norm']), label='source_grad_norm')
-        ax.plot(np.arange(num_batches), np.array(self.metrics['grad']['ot_norm']), label='ot_grad_norm')
-        ax.plot(np.arange(num_batches), np.array(self.metrics['grad']['angle']), label='grad_angle')
-        ax.legend(loc="lower right")
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        plt.savefig(os.path.join(folder_name, "grad_test_vals.pdf"), format="pdf")
+        if config['calc_grad_info'] is True:
+            fig, ax = plt.subplots()
+            ax.plot(np.arange(num_batches), np.array(self.metrics['target_loss']), label='target_loss')
+            ax.plot(np.arange(num_batches), np.array(self.metrics['grad']['source_norm']), label='source_grad_norm')
+            ax.plot(np.arange(num_batches), np.array(self.metrics['grad']['ot_norm']), label='ot_grad_norm')
+            ax.plot(np.arange(num_batches), np.array(self.metrics['grad']['angle']), label='grad_angle')
+            ax.legend(loc="lower right")
+            ax.spines["top"].set_visible(False)
+            ax.spines["right"].set_visible(False)
+            plt.savefig(os.path.join(folder_name, "grad_test_vals.pdf"), format="pdf")
 
 
 # Debugging by printing Wasserstein-based bounds for all methods!

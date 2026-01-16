@@ -52,7 +52,7 @@ def setup_local_config():
     }
 
     debug_config = {
-        "calc_label_shift": False,
+        "calc_label_shift": True,
         "calc_entanglement": False,
         "calc_margin": True,
         "calc_wrr": True,

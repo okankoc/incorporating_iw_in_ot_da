@@ -237,7 +237,7 @@ def run_uda(config, fabric):
                     config["report_target_train_risk"],
                     fabric,
                 )
-            debugger.save_metrics_plot()
+            debugger.save_metrics_plot(config['debug_options'])
     return results
 
 
@@ -358,5 +358,5 @@ if __name__ == "__main__":
     # torch.autograd.set_detect_anomaly(True)
     # os.environ["TORCH_SHOW_CPP_STACKTRACES"] = "1"
 
-    run_on_local()
-    # run_on_cluster()
+    # run_on_local()
+    run_on_cluster()
