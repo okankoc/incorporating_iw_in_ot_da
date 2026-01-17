@@ -5,17 +5,17 @@ def setup_cluster_config():
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
         "models": ["ResNet"],
         "resnet_size": 18,  # 18 or 50
-        "pretrain": True,
+        "pretrain": False,
         "num_pretrain_epochs": 5,  # if pretrain is True
         "loss": "margin",  # margin, euclidean or cross-entropy
-        "optimizer": "adam",  # alternatives: adam, sgd
+        "optimizer": "sgd",  # alternatives: adam, sgd
         "learning_rate": 1e-3,  # use 1e-4 for ResNets or a learning scheduler
         "momentum": 0.9,  # for SGD
         "weight_decay": 0.0,
         "num_epochs": 5,
         "num_runs": 1,
         "algs": [
-            "weighted_wrr",
+            "wrr",
         ],  # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
         # Debugging algorithms
         "debug": True,
@@ -31,7 +31,7 @@ def setup_cluster_config():
         # MNIST_TO_USPS, USPS_TO_MNIST, MNIST_TO_MNIST_M, SVHN_TO_MNIST,
         # CIFAR-10-C, PORTRAITS, OFFICEHOME, OFFICE_31, IMAGECLEFDA, VISDA17
         "scenarios": [
-            "MNIST_TO_USPS",
+            "MNIST_TO_MNIST_M",
         ],
         # Enable only when running a dataset for the first-time
         "preprocess": False,
@@ -54,7 +54,7 @@ def setup_cluster_config():
     }
 
     debug_config = {
-        "calc_label_shift": True,
+        "calc_label_shift": False,
         "calc_entanglement": False,
         "calc_margin": True,
         "calc_wrr": True,
@@ -90,7 +90,7 @@ def setup_alg_config(config):
         "entropy_reg": 1e-1,  # only for sinkhorn uot
         "add_source_loss": True,
         "separate_optim": True,
-        "uot_alg": "mm",  # sinkhorn or mm
+        "uot_alg": "mm",  # sinkhorn or mm or semi-relaxed
         "uot_init": False,  # initialize MM with semi-relaxed UOT
         "uot_iter_max": 1000,
         "autograd_at_convergence": True,

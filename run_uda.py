@@ -261,6 +261,11 @@ def init_opt(config, model):
             lr=config["learning_rate"],
             weight_decay=config["weight_decay"],
         )
+    elif config["optimizer"] == "adamw":
+        opt = torch.optim.AdamW(
+            model.parameters(),
+            lr=config['learning_rate'],
+            betas=(0.9, 0.999), eps=1e-8, weight_decay=1e-2)
     elif config["optimizer"] == "sgd":
         opt = torch.optim.SGD(
             model.parameters(),
@@ -326,8 +331,8 @@ def run_on_cluster():
     # Run all experiments
     for i, model in enumerate(config["models"]):
         if model == "ResNet":
-            config["optimizer"] = "sgd"
-            config["learning_rate"] = 1e-4
+            if config["optimizer"] == "adam":
+                print("YOU ARE TRAINING RESNETS WITH ADAM, BE CAREFUL!")
         for scenario in config["scenario_options"]["scenarios"]:
             config["model"] = model
             config["scenario_options"]["scenario"] = scenario
