@@ -3,9 +3,9 @@ def setup_local_config():
         # Experiment details
         "device": "cpu",  # 'cpu' or 'auto' to find gpu automatically
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        "model": "MLP",
+        "model": "ConvNet",
         "resnet_size": 18,  # 18 or 50
-        "pretrain": True,
+        "pretrain": False,
         "num_pretrain_epochs": 3,  # if pretrain is True
         "loss": "margin",  # 'margin', 'euclidean', 'cross-entropy'
         "optimizer": "adam",  # alternatives: adam, sgd
@@ -15,7 +15,7 @@ def setup_local_config():
         "num_epochs": 1,
         "num_runs": 1,
         "algs": [
-            "wrr",
+            "weighted_wrr",
         ],  # wrr, weighted_wrr, cons_wrr, jdot, lje, erm, cc, dann, fdal, reverse-kl
         # Debugging algorithms
         "debug": True,

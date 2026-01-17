@@ -1,5 +1,5 @@
 """Script for testing unsupervised domain adaptation algorithms in several different distribution shift scenarios."""
-
+import argparse
 import os
 import numpy as np
 import torch
@@ -358,5 +358,13 @@ if __name__ == "__main__":
     # torch.autograd.set_detect_anomaly(True)
     # os.environ["TORCH_SHOW_CPP_STACKTRACES"] = "1"
 
-    # run_on_local()
-    run_on_cluster()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str)
+    args = parser.parse_args()
+
+    if args.config == 'local':
+        run_on_local()
+    elif args.config == 'cluster':
+        run_on_cluster()
+    else:
+        raise Exception('Unknown config, choose local or cluster')

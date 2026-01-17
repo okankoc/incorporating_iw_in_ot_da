@@ -22,7 +22,7 @@ class Debugger:
         X_train, y_train = next(self.source_dl)
         X_shift, y_shift = next(self.target_dl)
         print("============================================")
-        print(f"Debugging/validating on test batch")
+        print("Debugging/validating on test batch")
         y_train = utils.one_hot(y_train, scenario.num_classes)
         y_shift = utils.one_hot(y_shift, scenario.num_classes)
         debug_model(
