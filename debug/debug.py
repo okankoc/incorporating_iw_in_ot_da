@@ -13,10 +13,9 @@ class Debugger:
     def __init__(self, scenario):
         self.source_dl = utils.ForeverDataIterator(scenario.source_test_dataloader)
         self.target_dl = utils.ForeverDataIterator(scenario.target_test_dataloader)
-        margin_dict = {'source': {'mean': [], 'std': []}, 'target': {'mean': [], 'std': []}}
         grad_dict = {'source_norm': [], 'ot_norm': [], 'angle': []}
-        self.metrics = {'target_loss': [], 'wrr': [], 'w2r2': [],
-                        'margin': margin_dict, 'grad': grad_dict}
+        self.metrics = {'target_loss': [], 'source_loss': [], 'wrr': [], 'w2r2': [],
+                        'margin': [], 'grad': grad_dict, 'lambda': []}
 
     def calc_metrics(self, config, model, loss_fun, scenario, fabric):
         X_train, y_train = next(self.source_dl)
@@ -60,13 +59,14 @@ class Debugger:
         # Saving margin and target loss in a separate plot
         if config['calc_margin'] is True:
             fig, ax = plt.subplots()
-            ax.plot(np.arange(num_batches), np.array(self.metrics['target_loss']), label='target_loss')
-            ax.errorbar(x=np.arange(num_batches), y=self.metrics['margin']['source']['mean'], yerr=self.metrics['margin']['source']['std'], label='source_margin')
-            ax.errorbar(x=np.arange(num_batches), y=self.metrics['margin']['target']['mean'], yerr=self.metrics['margin']['target']['std'], label='target_margin')
+            plt.title('Margin parameter M during ERM-training')
+            ax.plot(np.arange(num_batches), np.array(self.metrics['source_loss']), label='source_loss')
+            ax.plot(np.arange(num_batches), np.array(self.metrics['margin']), label='M at eta = 0.1')
             ax.legend(loc="lower right")
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
-            plt.savefig(os.path.join(folder_name, "margin_test_vals.pdf"), format="pdf")
+            plt.xlabel('Test-batch index')
+            plt.savefig(os.path.join(folder_name, "margin_test_vals.png"), format="png", bbox_inches='tight', pad_inches=0.02)
 
         # Saving gradient norms and target loss in a separate plot
         if config['calc_grad_info'] is True:
@@ -80,6 +80,16 @@ class Debugger:
             ax.spines["right"].set_visible(False)
             plt.savefig(os.path.join(folder_name, "grad_test_vals.pdf"), format="pdf")
 
+        if config['est_lambda'] is True:
+            fig, ax = plt.subplots()
+            ax.plot(np.arange(num_batches), np.array(self.metrics['target_loss']), label='target_loss')
+            ax.plot(np.arange(num_batches), np.array(self.metrics['wrr']), label='wrr')
+            ax.plot(np.arange(num_batches), np.array(self.metrics['lambda']), label='lambda estimate')
+            ax.legend(loc="lower right")
+            ax.spines["top"].set_visible(False)
+            ax.spines["right"].set_visible(False)
+            plt.savefig(os.path.join(folder_name, "lambda_est.png"), format="png", bbox_inches='tight', pad_inches=0.02)
+
 
 # Debugging by printing Wasserstein-based bounds for all methods!
 def debug_model(
@@ -88,10 +98,11 @@ def debug_model(
     pred_source = model(X_source)
     pred_target = model(X_target)
     target_loss = loss_fun(pred_target, y_target)
+    source_loss = loss_fun(pred_source, y_source)
+    metrics['source_loss'].append(source_loss.item())
     metrics['target_loss'].append(target_loss.item())
     print(f"target_loss: {target_loss.item()}")
     if config["calc_wrr"]:
-        source_loss = loss_fun(pred_source, y_source)
         ot_cost, ot_mat = calc_ot(pred_source, pred_target, fabric)
         wrr = source_loss + ot_cost
         metrics['wrr'].append(wrr.item())
@@ -104,14 +115,18 @@ def debug_model(
     if config["calc_entanglement"]:
         calc_entanglement(y_source, y_target, ot_mat)
     if config["calc_margin"]:
-        std_margin, avg_margin, _, _ = calc_margin(pred_source, y_source)
-        metrics['margin']['source']['mean'].append(avg_margin.item())
-        metrics['margin']['source']['std'].append(std_margin.item())
-        print(f"Source margin mean: {avg_margin}, std: {std_margin}")
-        std_margin, avg_margin, _, _ = calc_margin(pred_target, y_target)
-        print(f"Target margin mean: {avg_margin}, std: {std_margin}")
-        metrics['margin']['target']['mean'].append(avg_margin.item())
-        metrics['margin']['target']['std'].append(std_margin.item())
+        # Fix an eta for now
+        eta = 0.1
+        dists = []
+        for i in range(model.num_classes):
+            mask = (torch.argmax(y_source, dim=1) == i)
+            cond = pred_source[mask]
+            non_cond = pred_source[~mask]
+            for pred in cond:
+                d = torch.min(torch.norm(non_cond - pred, dim = 1))
+                dists.append(d)
+        M = torch.quantile(torch.tensor(dists), eta)
+        metrics['margin'].append(M)
     if config["calc_grad_info"]:
         mean_source_grad_norm, mean_ot_grad_norm, mean_angle = calc_grad_info(model, loss_fun, fabric, pred_source,
                                                                               pred_target, y_source)
@@ -129,9 +144,11 @@ def debug_model(
     if config["calc_label_shift"]:
         calc_w_distance_label_shift(y_source, y_target, model.num_classes)
     if config["calc_gradual_shift"]:
-        calc_gradual_shift(
-            loss_fun, pred_source, pred_target, y_source, y_target, model.num_classes
+        lambda_est = calc_gradual_shift(
+            loss_fun, pred_source, pred_target, y_source, y_target, model.num_classes, M
         )
+        print(f"Lambda estimate: {lambda_est}")
+        metrics['lambda'].append(lambda_est)
 
 
 def debug_weighted_wrr(config, model, fabric, loss_fun, pred_source, pred_target, y_source):
@@ -279,16 +296,6 @@ def calc_w_distance_label_shift(y_source, y_target, num_classes):
     q_y /= torch.sum(q_y)
     w_1_euclidean_dist = np.sqrt(2) * torch.sum(torch.abs(p_y - q_y)) / 2
     print(f"W1_distance_labels: {w_1_euclidean_dist}")
-
-
-def calc_margin(preds, labels):
-    # Get correct points with matching labels
-    # Find the gap between max and second max (by sorting for now)
-    pred_sorted_val, pred_sorted_ind = torch.sort(preds, dim=1, descending=True)
-    correct = pred_sorted_ind[:, 0] == labels.argmax(1)
-    margin = pred_sorted_val[correct, 0] - pred_sorted_val[correct, 1]
-    std_margin, mean_margin = torch.std_mean(margin)
-    return std_margin, mean_margin, margin, correct
 
 
 def calc_weighted_wrr(

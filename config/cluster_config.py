@@ -3,12 +3,12 @@ def setup_cluster_config():
         # Experiment details
         "device": "auto",  # 'cpu' or 'auto' to find gpu automatically
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        "models": ["ResNet"],
+        "models": ["MLP"],
         "resnet_size": 18,  # 18 or 50
         "pretrain": False,
         "num_pretrain_epochs": 5,  # if pretrain is True
         "loss": "margin",  # margin, euclidean or cross-entropy
-        "optimizer": "sgd",  # alternatives: adam, sgd
+        "optimizer": "adam",  # alternatives: adam, sgd
         "learning_rate": 1e-3,  # use 1e-4 for ResNets or a learning scheduler
         "momentum": 0.9,  # for SGD
         "weight_decay": 0.0,

@@ -5,17 +5,18 @@ def setup_local_config():
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
         "model": "ConvNet",
         "resnet_size": 18,  # 18 or 50
-        "pretrain": False,
-        "num_pretrain_epochs": 3,  # if pretrain is True
+        "pretrain": True,
+        "num_pretrain_epochs": 5,  # if pretrain is True
         "loss": "margin",  # 'margin', 'euclidean', 'cross-entropy'
         "optimizer": "adam",  # alternatives: adam, sgd
+        "adam_beta2": 0.98,
         "learning_rate": 1e-3,  # use 1e-4 for ResNets or a learning scheduler
         "momentum": 0.9,  # for SGD
         "weight_decay": 0.0,
-        "num_epochs": 1,
-        "num_runs": 1,
+        "num_epochs": 5,
+        "num_runs": 3,
         "algs": [
-            "weighted_wrr",
+            "wrr", "weighted_wrr", "erm", "dann", "reverse-kl", "cc", "lje"
         ],  # wrr, weighted_wrr, cons_wrr, jdot, lje, erm, cc, dann, fdal, reverse-kl
         # Debugging algorithms
         "debug": True,
@@ -30,7 +31,7 @@ def setup_local_config():
         # Distribution shift scenario
         # MNIST_TO_USPS, USPS_TO_MNIST, MNIST_TO_MNIST_M, SVHN_TO_MNIST,
         # CIFAR-10-C, PORTRAITS, OFFICE_31, OFFICEHOME, IMAGECLEFDA, VISDA17
-        "scenario": "MNIST_TO_USPS",
+        "scenario": "PORTRAITS",
         # Enable only when running a dataset for the first-time
         "preprocess": False,
         # Data loader options
@@ -38,6 +39,7 @@ def setup_local_config():
         # Test set dataloader options
         "test_batch_size": 512,
         "shuffle": True,
+        "test_shuffle": True,
         # Dataset-specific settings
         "cifar-10-corruptions": ["fog", "frost", "snow"],
         "portraits-size": [186, 171],
@@ -52,15 +54,16 @@ def setup_local_config():
     }
 
     debug_config = {
-        "calc_label_shift": True,
+        "calc_label_shift": False,
         "calc_entanglement": False,
         "calc_margin": True,
         "calc_wrr": True,
         "calc_weighted_wrr": True,
         "verbose_weighted_wrr": False,
         "calc_weight_info": False,
-        "calc_grad_info": True,
-        "calc_gradual_shift": False,
+        "calc_grad_info": False,
+        "calc_gradual_shift": True,
+        "est_lambda": True,
     }
 
     config["scenario_options"] = scenario_config

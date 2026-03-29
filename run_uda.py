@@ -39,7 +39,7 @@ def init_scenario(config, fabric):
     }
     test_dataloader_options = {
         "batch_size": config["test_batch_size"],
-        "shuffle": False,
+        "shuffle": config["test_shuffle"],
         "drop_last": False,
     }
     if config["scenario"] == "MNIST_TO_USPS":
@@ -260,12 +260,13 @@ def init_opt(config, model):
             model.parameters(),
             lr=config["learning_rate"],
             weight_decay=config["weight_decay"],
-        )
+            betas=(0.9, config["adam_beta2"]), eps=1e-8)
     elif config["optimizer"] == "adamw":
         opt = torch.optim.AdamW(
             model.parameters(),
             lr=config['learning_rate'],
-            betas=(0.9, 0.999), eps=1e-8, weight_decay=1e-2)
+            weight_decay=config['weight_decay'],
+            betas=(0.9, 0.999), eps=1e-8)
     elif config["optimizer"] == "sgd":
         opt = torch.optim.SGD(
             model.parameters(),

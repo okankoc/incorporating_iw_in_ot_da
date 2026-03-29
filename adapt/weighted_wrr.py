@@ -21,10 +21,11 @@ class WeightedWRR:
         self.uot_iter_max = config["uot_iter_max"]
         self.separate_optim = config["separate_optim"]
         if self.separate_optim is True:
-            self.opt2 = torch.optim.Adam(
+            self.opt2 = torch.optim.SGD(
                 model.parameters(),
+                momentum=0.0,
                 lr=self.opt.defaults["lr"],
-                weight_decay=self.opt.defaults["weight_decay"],
+                weight_decay=0.0,
             )
             model, self.opt, self.opt2 = fabric.setup(model, self.opt, self.opt2)
         else:
