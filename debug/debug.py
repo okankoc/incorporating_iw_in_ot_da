@@ -13,9 +13,16 @@ class Debugger:
     def __init__(self, scenario):
         self.source_dl = utils.ForeverDataIterator(scenario.source_test_dataloader)
         self.target_dl = utils.ForeverDataIterator(scenario.target_test_dataloader)
-        grad_dict = {'source_norm': [], 'ot_norm': [], 'angle': []}
-        self.metrics = {'target_loss': [], 'source_loss': [], 'wrr': [], 'w2r2': [],
-                        'margin': [], 'grad': grad_dict, 'lambda': []}
+        grad_dict = {"source_norm": [], "ot_norm": [], "angle": []}
+        self.metrics = {
+            "target_loss": [],
+            "source_loss": [],
+            "wrr": [],
+            "w2r2": [],
+            "margin": [],
+            "grad": grad_dict,
+            "lambda": [],
+        }
 
     def calc_metrics(self, config, model, loss_fun, scenario, fabric):
         X_train, y_train = next(self.source_dl)
@@ -37,58 +44,107 @@ class Debugger:
         )
         print("============================================")
 
-
     # Assuming only one algorithm and one run
     def save_metrics_plot(self, config):
-        num_batches = len(self.metrics['wrr'])
+        num_batches = len(self.metrics["wrr"])
         folder_name = os.path.join("results", "debug")
         os.makedirs(folder_name, exist_ok=True)
 
         # Saving WRR and weighted WRR values together with target loss in a separate plot
         fig, ax = plt.subplots()
-        ax.plot(np.arange(num_batches), np.array(self.metrics['target_loss']), label='target_loss')
-        if config['calc_wrr'] is True:
-            ax.plot(np.arange(num_batches), np.array(self.metrics['wrr']), label='wrr')
-        if config['calc_weighted_wrr'] is True:
-            ax.plot(np.arange(num_batches), np.array(self.metrics['w2r2']), label='weighted_wrr')
+        ax.plot(
+            np.arange(num_batches),
+            np.array(self.metrics["target_loss"]),
+            label="target_loss",
+        )
+        if config["calc_wrr"] is True:
+            ax.plot(np.arange(num_batches), np.array(self.metrics["wrr"]), label="wrr")
+        if config["calc_weighted_wrr"] is True:
+            ax.plot(
+                np.arange(num_batches),
+                np.array(self.metrics["w2r2"]),
+                label="weighted_wrr",
+            )
         ax.legend(loc="lower right")
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         plt.savefig(os.path.join(folder_name, "wrr_test_vals.pdf"), format="pdf")
 
         # Saving margin and target loss in a separate plot
-        if config['calc_margin'] is True:
+        if config["calc_margin"] is True:
             fig, ax = plt.subplots()
-            plt.title('Margin parameter M during ERM-training')
-            ax.plot(np.arange(num_batches), np.array(self.metrics['source_loss']), label='source_loss')
-            ax.plot(np.arange(num_batches), np.array(self.metrics['margin']), label='M at eta = 0.1')
+            plt.title("Margin parameter M during ERM-training")
+            ax.plot(
+                np.arange(num_batches),
+                np.array(self.metrics["source_loss"]),
+                label="source_loss",
+            )
+            ax.plot(
+                np.arange(num_batches),
+                np.array(self.metrics["margin"]),
+                label="M at eta = 0.1",
+            )
             ax.legend(loc="lower right")
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
-            plt.xlabel('Test-batch index')
-            plt.savefig(os.path.join(folder_name, "margin_test_vals.png"), format="png", bbox_inches='tight', pad_inches=0.02)
+            plt.xlabel("Test-batch index")
+            plt.savefig(
+                os.path.join(folder_name, "margin_test_vals.png"),
+                format="png",
+                bbox_inches="tight",
+                pad_inches=0.02,
+            )
 
         # Saving gradient norms and target loss in a separate plot
-        if config['calc_grad_info'] is True:
+        if config["calc_grad_info"] is True:
             fig, ax = plt.subplots()
-            ax.plot(np.arange(num_batches), np.array(self.metrics['target_loss']), label='target_loss')
-            ax.plot(np.arange(num_batches), np.array(self.metrics['grad']['source_norm']), label='source_grad_norm')
-            ax.plot(np.arange(num_batches), np.array(self.metrics['grad']['ot_norm']), label='ot_grad_norm')
-            ax.plot(np.arange(num_batches), np.array(self.metrics['grad']['angle']), label='grad_angle')
+            ax.plot(
+                np.arange(num_batches),
+                np.array(self.metrics["target_loss"]),
+                label="target_loss",
+            )
+            ax.plot(
+                np.arange(num_batches),
+                np.array(self.metrics["grad"]["source_norm"]),
+                label="source_grad_norm",
+            )
+            ax.plot(
+                np.arange(num_batches),
+                np.array(self.metrics["grad"]["ot_norm"]),
+                label="ot_grad_norm",
+            )
+            ax.plot(
+                np.arange(num_batches),
+                np.array(self.metrics["grad"]["angle"]),
+                label="grad_angle",
+            )
             ax.legend(loc="lower right")
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
             plt.savefig(os.path.join(folder_name, "grad_test_vals.pdf"), format="pdf")
 
-        if config['est_lambda'] is True:
+        if config["est_lambda"] is True:
             fig, ax = plt.subplots()
-            ax.plot(np.arange(num_batches), np.array(self.metrics['target_loss']), label='target_loss')
-            ax.plot(np.arange(num_batches), np.array(self.metrics['wrr']), label='wrr')
-            ax.plot(np.arange(num_batches), np.array(self.metrics['lambda']), label='lambda estimate')
+            ax.plot(
+                np.arange(num_batches),
+                np.array(self.metrics["target_loss"]),
+                label="target_loss",
+            )
+            ax.plot(np.arange(num_batches), np.array(self.metrics["wrr"]), label="wrr")
+            ax.plot(
+                np.arange(num_batches),
+                np.array(self.metrics["lambda"]),
+                label="lambda estimate",
+            )
             ax.legend(loc="lower right")
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
-            plt.savefig(os.path.join(folder_name, "lambda_est.png"), format="png", bbox_inches='tight', pad_inches=0.02)
+            plt.savefig(
+                os.path.join(folder_name, "lambda_est.png"),
+                format="png",
+                bbox_inches="tight",
+                pad_inches=0.02,
+            )
 
 
 # Debugging by printing Wasserstein-based bounds for all methods!
@@ -99,19 +155,21 @@ def debug_model(
     pred_target = model(X_target)
     target_loss = loss_fun(pred_target, y_target)
     source_loss = loss_fun(pred_source, y_source)
-    metrics['source_loss'].append(source_loss.item())
-    metrics['target_loss'].append(target_loss.item())
+    metrics["source_loss"].append(source_loss.item())
+    metrics["target_loss"].append(target_loss.item())
     print(f"target_loss: {target_loss.item()}")
     if config["calc_wrr"]:
         ot_cost, ot_mat = calc_ot(pred_source, pred_target, fabric)
         wrr = source_loss + ot_cost
-        metrics['wrr'].append(wrr.item())
+        metrics["wrr"].append(wrr.item())
         print(
             f"WRR: {wrr.item()}, ot_cost: {ot_cost.item()}, source_loss: {source_loss.item()}"
         )
     if config["calc_weighted_wrr"]:
-        w_wrr = debug_weighted_wrr(config, model, fabric, loss_fun, pred_source, pred_target, y_source)
-        metrics['w2r2'].append(w_wrr.item())
+        w_wrr = debug_weighted_wrr(
+            config, model, fabric, loss_fun, pred_source, pred_target, y_source
+        )
+        metrics["w2r2"].append(w_wrr.item())
     if config["calc_entanglement"]:
         calc_entanglement(y_source, y_target, ot_mat)
     if config["calc_margin"]:
@@ -119,20 +177,21 @@ def debug_model(
         eta = 0.1
         dists = []
         for i in range(model.num_classes):
-            mask = (torch.argmax(y_source, dim=1) == i)
+            mask = torch.argmax(y_source, dim=1) == i
             cond = pred_source[mask]
             non_cond = pred_source[~mask]
             for pred in cond:
-                d = torch.min(torch.norm(non_cond - pred, dim = 1))
+                d = torch.min(torch.norm(non_cond - pred, dim=1))
                 dists.append(d)
         M = torch.quantile(torch.tensor(dists), eta)
-        metrics['margin'].append(M)
+        metrics["margin"].append(M)
     if config["calc_grad_info"]:
-        mean_source_grad_norm, mean_ot_grad_norm, mean_angle = calc_grad_info(model, loss_fun, fabric, pred_source,
-                                                                              pred_target, y_source)
-        metrics['grad']['source_norm'].append(mean_source_grad_norm.item())
-        metrics['grad']['ot_norm'].append(mean_ot_grad_norm.item())
-        metrics['grad']['angle'].append(mean_angle.item())
+        mean_source_grad_norm, mean_ot_grad_norm, mean_angle = calc_grad_info(
+            model, loss_fun, fabric, pred_source, pred_target, y_source
+        )
+        metrics["grad"]["source_norm"].append(mean_source_grad_norm.item())
+        metrics["grad"]["ot_norm"].append(mean_ot_grad_norm.item())
+        metrics["grad"]["angle"].append(mean_angle.item())
     if config["calc_weight_info"]:
         weight_norms = []
         for name, param in model.named_parameters():
@@ -148,10 +207,12 @@ def debug_model(
             loss_fun, pred_source, pred_target, y_source, y_target, model.num_classes, M
         )
         print(f"Lambda estimate: {lambda_est}")
-        metrics['lambda'].append(lambda_est)
+        metrics["lambda"].append(lambda_est)
 
 
-def debug_weighted_wrr(config, model, fabric, loss_fun, pred_source, pred_target, y_source):
+def debug_weighted_wrr(
+    config, model, fabric, loss_fun, pred_source, pred_target, y_source
+):
     w_wrr, w_ot_mat, w_source, w_source_loss = calc_weighted_wrr(
         model, fabric, loss_fun, pred_source, pred_target, y_source, reg=1e-1
     )

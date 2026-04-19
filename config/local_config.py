@@ -1,7 +1,7 @@
 def setup_local_config():
     config = {
         # Experiment details
-        "device": "cpu",  # 'cpu' or 'auto' to find gpu automatically
+        "device": "auto",  # 'cpu' or 'auto' to find gpu automatically
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
         "model": "ConvNet",
         "resnet_size": 18,  # 18 or 50
@@ -16,7 +16,7 @@ def setup_local_config():
         "num_epochs": 5,
         "num_runs": 3,
         "algs": [
-            "wrr", "weighted_wrr", "erm", "dann", "reverse-kl", "cc", "lje"
+            "weighted_wrr",
         ],  # wrr, weighted_wrr, cons_wrr, jdot, lje, erm, cc, dann, fdal, reverse-kl
         # Debugging algorithms
         "debug": True,

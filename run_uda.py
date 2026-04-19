@@ -1,4 +1,5 @@
 """Script for testing unsupervised domain adaptation algorithms in several different distribution shift scenarios."""
+
 import argparse
 import os
 import numpy as np
@@ -212,13 +213,7 @@ def run_uda(config, fabric):
                     if config["debug"] is True and (
                         batch_idx % config["debug_every_n"] == 0
                     ):
-                        debugger.calc_metrics(
-                            config,
-                            model,
-                            loss_fun,
-                            scenario,
-                            fabric
-                        )
+                        debugger.calc_metrics(config, model, loss_fun, scenario, fabric)
                     batch_idx += 1
                     if (
                         config["n_batches_per_epoch"] != -1
@@ -237,7 +232,7 @@ def run_uda(config, fabric):
                     config["report_target_train_risk"],
                     fabric,
                 )
-            debugger.save_metrics_plot(config['debug_options'])
+            debugger.save_metrics_plot(config["debug_options"])
     return results
 
 
@@ -260,13 +255,17 @@ def init_opt(config, model):
             model.parameters(),
             lr=config["learning_rate"],
             weight_decay=config["weight_decay"],
-            betas=(0.9, config["adam_beta2"]), eps=1e-8)
+            betas=(0.9, config["adam_beta2"]),
+            eps=1e-8,
+        )
     elif config["optimizer"] == "adamw":
         opt = torch.optim.AdamW(
             model.parameters(),
-            lr=config['learning_rate'],
-            weight_decay=config['weight_decay'],
-            betas=(0.9, 0.999), eps=1e-8)
+            lr=config["learning_rate"],
+            weight_decay=config["weight_decay"],
+            betas=(0.9, 0.999),
+            eps=1e-8,
+        )
     elif config["optimizer"] == "sgd":
         opt = torch.optim.SGD(
             model.parameters(),
@@ -368,9 +367,9 @@ if __name__ == "__main__":
     parser.add_argument("--config", type=str)
     args = parser.parse_args()
 
-    if args.config == 'local':
+    if args.config == "local":
         run_on_local()
-    elif args.config == 'cluster':
+    elif args.config == "cluster":
         run_on_cluster()
     else:
-        raise Exception('Unknown config, choose local or cluster')
+        raise Exception("Unknown config, choose local or cluster")

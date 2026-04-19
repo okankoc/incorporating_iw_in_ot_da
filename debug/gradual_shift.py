@@ -6,7 +6,7 @@ import linkage
 
 @torch.no_grad()
 def calc_gradual_shift(
-        loss_fun, pred_source, pred_target, y_source, y_target, num_classes, margin_m
+    loss_fun, pred_source, pred_target, y_source, y_target, num_classes, margin_m
 ):
 
     source_means = torch.zeros(num_classes, num_classes)
@@ -27,10 +27,12 @@ def calc_gradual_shift(
     # Modeling conditional distances using a log-normal distribution
     for i in range(num_classes):
         s, mu = torch.std_mean(torch.log(sorted_dists[i]))
-        mean = torch.exp(mu + 0.5*s*s)
+        mean = torch.exp(mu + 0.5 * s * s)
         std = torch.sqrt((torch.exp(s * s) - 1) * torch.exp(2 * mu + s * s))
         entropy = torch.log(s * torch.exp(mu))
-        lambda_est_cond[i] = -entropy * torch.pow((mean + 2*std) / margin_m, 2) / ((1 - eta) * rho)
+        lambda_est_cond[i] = (
+            -entropy * torch.pow((mean + 2 * std) / margin_m, 2) / ((1 - eta) * rho)
+        )
     # print(f"Estimated lambda inverse per conditional: {lambda_est_inv_cond}")
     num_source = y_source.shape[0]
     lambda_est = torch.sum(lambda_est_cond * (label_counts_source / num_source))
@@ -38,13 +40,13 @@ def calc_gradual_shift(
 
     ##### PLOT DISTANCES FROM THE SOURCE CONDITIONAL MEANS
     # cond_dist, correct_labeled = compute_cond_dist(
-        # pred_target, y_target, source_means, num_classes
+    # pred_target, y_target, source_means, num_classes
     # )
     # plot_distances(cond_dist, correct_labeled, num_classes)
     # plt.show()
 
     ##### LINKAGE METHOD TO CHECK IF THERE IS GRADUAL SHIFT
-    '''
+    """
     Z = linkage.compute_cluster(pred_source_cond, pred_target, method="single")
     # linkage.plot_cluster(Z, num_targets, num_classes)
     y_pseudo = linkage.compute_pseudolabels(Z, num_targets, num_classes, soft=False)
@@ -55,7 +57,7 @@ def calc_gradual_shift(
         / num_targets
     )
     print(f"Linkage acc: {pseudo_acc}")
-    '''
+    """
 
 
 def compute_cond_dist(pred_target, y_target, source_means, num_classes):
@@ -80,20 +82,25 @@ def compute_cond_dist(pred_target, y_target, source_means, num_classes):
 def plot_distances(dist, correct_labeled, num_classes):
     plt.figure(figsize=(10, 8))
     plt.title("Distance of target conditionals to source class mean")
-    cmap = plt.get_cmap('tab10')
+    cmap = plt.get_cmap("tab10")
     for i in range(num_classes):
         sort_dist, sort_idx = torch.sort(dist[i][i], descending=False)
         x_vec = torch.range(1, len(sort_idx))
         # sizes = [50 if value == 0 else 10 for value in correct_labeled[i][sort_idx]]
         # plt.scatter(x_vec, sort_dist, s=sizes, label=str(i))
         mask = correct_labeled[i][sort_idx].squeeze()
-        plt.plot(x_vec, sort_dist, '-', label=str(i), c=cmap(i))
-        plt.plot(x_vec[mask], sort_dist[mask], 'o', c=cmap(i))
-        plt.plot(x_vec[~mask], sort_dist[~mask], 'x', c=cmap(i))
-    plt.ylabel('Euclidean distance')
-    plt.xlabel('Target class conditional index')
+        plt.plot(x_vec, sort_dist, "-", label=str(i), c=cmap(i))
+        plt.plot(x_vec[mask], sort_dist[mask], "o", c=cmap(i))
+        plt.plot(x_vec[~mask], sort_dist[~mask], "x", c=cmap(i))
+    plt.ylabel("Euclidean distance")
+    plt.xlabel("Target class conditional index")
     plt.legend()
 
     folder_name = os.path.joint("results", "debug")
     os.makedirs(folder_name, exist_ok=True)
-    plt.savefig(os.path.join(folder_name, "gradual_shift"), format="png", bbox_inches='tight', pad_inches=0)
+    plt.savefig(
+        os.path.join(folder_name, "gradual_shift"),
+        format="png",
+        bbox_inches="tight",
+        pad_inches=0,
+    )

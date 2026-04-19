@@ -8,7 +8,7 @@ from torch.utils.data import Dataset, DataLoader
 class ForeverDataIterator:
     """A data iterator that will never stop producing data.
     Taken from fDAL code (MIT License): https://github.com/nv-tlabs/fdal,
-    who also took it from somewhere else it seems. """
+    who also took it from somewhere else it seems."""
 
     def __init__(self, data_loader: DataLoader):
         self.data_loader = data_loader
@@ -24,7 +24,6 @@ class ForeverDataIterator:
 
     def __len__(self):
         return len(self.data_loader)
-
 
 
 class GenericDataset(Dataset):

@@ -63,7 +63,7 @@ class WeightedWRR:
             ot_mat = ot.sinkhorn_unbalanced(
                 w_source, w_target, cost_mat, self.reg, self.reg_m, method="sinkhorn"
             )
-        elif self.uot_alg == 'semi-relaxed':
+        elif self.uot_alg == "semi-relaxed":
             ot_mat = torch.softmax(-cost_mat / self.reg, dim=0) * w_target[None, :]
         else:
             raise Exception("UOT method NOT implemented!")

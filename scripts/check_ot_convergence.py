@@ -8,6 +8,7 @@ and check for convergence
 
 """
 
+import matplotlib
 import numpy as np
 import torch
 import geomloss
@@ -19,6 +20,8 @@ import shifts
 import synthetic_shifts
 from models.mlp import MultiLayerPerceptron as MLP
 from sinkhorn_uot import fast_uot_sinkhorn, mm_unbalanced
+
+matplotlib.use(backend="QtAgg", force=True)
 
 
 def calc_emd(f_source, f_target, p):
@@ -226,9 +229,7 @@ def check_mnist_to_usps():
     method = "emd"
     dl_options = {"batch_size": 4096, "shuffle": False, "drop_last": True}
     reset_all(seed=0)
-    scenario = shifts.MNIST_to_USPS(
-        dl_options, dl_options, use_sampler=False, class_balanced=False
-    )
+    scenario = shifts.MNIST_to_USPS(dl_options, dl_options)
     for (X_source, y_source), (X_target, y_target) in zip(
         scenario.source_dataloader, scenario.target_dataloader
     ):
@@ -249,9 +250,7 @@ def check_mnist_to_usps():
     for i in range(num_trials):
         dl_options = {"batch_size": batch_sizes[i], "shuffle": False, "drop_last": True}
         reset_all(seed=i)
-        scenario = shifts.MNIST_to_USPS(
-            dl_options, dl_options, use_sampler=False, class_balanced=False
-        )
+        scenario = shifts.MNIST_to_USPS(dl_options, dl_options)
         print(f"Batch size: {batch_sizes[i]}")
         for j, ((X_source, y_source), (X_target, y_target)) in enumerate(
             zip(scenario.source_dataloader, scenario.target_dataloader)
@@ -448,8 +447,8 @@ def compare_gromov_wasserstein_to_ot():
 def check_procrustes_alignment():
     from scipy.spatial import procrustes
 
-    a = np.array([[1, 3], [1, 2], [1, 1], [2, 1]], 'd')
-    b = np.array([[4, -2], [4, -4], [4, -6], [2, -6]], 'd')
+    a = np.array([[1, 3], [1, 2], [1, 1], [2, 1]], "d")
+    b = np.array([[4, -2], [4, -4], [4, -6], [2, -6]], "d")
     mtx1, mtx2, disparity = procrustes(a, b)
     round(disparity)
     print(mtx1, mtx2)
@@ -459,9 +458,9 @@ if __name__ == "__main__":
     # logging.getLogger("torch._dynamo").setLevel(logging.ERROR)
     # logging.getLogger("torch._inductor").setLevel(logging.ERROR)
 
-    check_procrustes_alignment()
+    # check_procrustes_alignment()
     # compare_gromov_wasserstein_to_ot()
     # run_uot_solvers()
     # compare_ot_solvers()
-    # check_gaussians()
+    check_gaussians()
     # check_mnist_to_usps()
