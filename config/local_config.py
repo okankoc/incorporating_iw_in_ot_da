@@ -1,9 +1,9 @@
 def setup_local_config():
     config = {
         # Experiment details
-        "device": "auto",  # 'cpu' or 'auto' to find gpu automatically
+        "device": "cpu",  # 'cpu' or 'auto' to find gpu automatically
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        "model": "ConvNet",
+        "model": "MLP",
         "resnet_size": 18,  # 18 or 50
         "pretrain": True,
         "num_pretrain_epochs": 5,  # if pretrain is True
@@ -14,12 +14,12 @@ def setup_local_config():
         "momentum": 0.9,  # for SGD
         "weight_decay": 0.0,
         "num_epochs": 5,
-        "num_runs": 3,
+        "num_runs": 1,
         "algs": [
-            "weighted_wrr",
-        ],  # wrr, weighted_wrr, cons_wrr, jdot, lje, erm, cc, dann, fdal, reverse-kl
+            "mmd",
+        ],  # wrr, weighted_wrr, cons_wrr, jdot, lje, erm, cc, dann, fdal, reverse-kl, mmd
         # Debugging algorithms
-        "debug": True,
+        "debug": False,
         "debug_every_n": 50,
         "n_batches_per_epoch": -1,  # if -1 uses all batches
         "report_source_train_risk": False,
@@ -31,7 +31,7 @@ def setup_local_config():
         # Distribution shift scenario
         # MNIST_TO_USPS, USPS_TO_MNIST, MNIST_TO_MNIST_M, SVHN_TO_MNIST,
         # CIFAR-10-C, PORTRAITS, OFFICE_31, OFFICEHOME, IMAGECLEFDA, VISDA17
-        "scenario": "PORTRAITS",
+        "scenario": "MNIST_TO_USPS",
         # Enable only when running a dataset for the first-time
         "preprocess": False,
         # Data loader options
@@ -106,7 +106,7 @@ def setup_alg_config(config):
     config["jdot"] = {
         "alpha": 0.001,
         "lambda": 0.001,
-        "track_layer": -2,
+        "track_layer": "flatten", #"flatten" for ConvNet, -2 for MLP
         "add_source_loss": True,
         "use_squared_dist": False,
     }
@@ -114,9 +114,11 @@ def setup_alg_config(config):
     config["cons_wrr"] = {"norm": 2, "entropy_reg": 1e-3, "scale": 1.0, "thresh": 0.01}
 
     config["mmd"] = {
-        "alpha": 0.1,
+        "alpha": 1.0,
         "gammas": [0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0],
         "use_squared_dist": True,
+        "use_features": False, # if false uses predictions
+        "track_layer": -2, #"flatten", #"flatten" for ConvNet, -2 for MLP
     }
 
     config["dann"] = {
