@@ -108,9 +108,12 @@ def train_model_on_source(config, model, loss_fun, scenario, opt, fabric):
     )
     # Report accuracy/loss on whole training dataset
     test(scenario.source_dataloader, model, loss_fun, fabric)
-    print(f"Saving parameters to file: {save_path}")
-    os.makedirs(folder_path, exist_ok=True)
-    torch.save(model.state_dict(), save_path)
+    fabric.barrier()
+    if fabric.global_rank == 0:
+        print(f"Saving parameters to file: {save_path}")
+        os.makedirs(folder_path, exist_ok=True)
+        torch.save(model.state_dict(), save_path)
+    fabric.barrier()
     return model
 
 
@@ -132,12 +135,15 @@ def train_model_on_source_and_target(config, model, loss_fun, scenario, opt, fab
         config["num_pretrain_epochs"],
         fabric,
         report_every=10,
-    )
+    )   
     # Report accuracy/loss on whole training dataset
     test(scenario.source_dataloader, model, loss_fun, fabric)
-    print(f"Saving parameters to file: {save_path}")
-    os.makedirs(folder_path, exist_ok=True)
-    torch.save(model.state_dict(), save_path)
+    fabric.barrier()
+    if fabric.global_rank == 0:
+        print(f"Saving parameters to file: {save_path}")
+        os.makedirs(folder_path, exist_ok=True)
+        torch.save(model.state_dict(), save_path)
+    fabric.barrier()
     return model
 
 
@@ -148,8 +154,8 @@ def train(
     optimizer,
     num_epochs,
     fabric,
-    report_every=1,
-    report_metrics=True,
+    report_every=10,
+    report_metrics=False,
 ):
     size = len(dataloader.dataset)
     t0 = time.perf_counter()
@@ -158,10 +164,10 @@ def train(
         print(f"Epoch {epoch+1}\n-------------------------------")
         for batch, (X, y) in enumerate(dataloader):
             y = one_hot(y, model.num_classes)
+            optimizer.zero_grad(set_to_none=True)
             loss = loss_fun(model(X), y)
             fabric.backward(loss)
             optimizer.step()
-            optimizer.zero_grad()
             if batch % report_every == 0:
                 loss, current = loss.item(), (batch + 1) * len(X)
                 print(f"loss: {loss:>7f} epoch:{epoch+1} [{current:>5d}/{size:>5d}]")

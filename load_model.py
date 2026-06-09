@@ -1,3 +1,4 @@
+import os
 import copy
 import types
 import torch
@@ -18,7 +19,7 @@ def load_model(config, fabric, scenario):
             # Load parameters from a file
             model.load_state_dict(torch.load(save_path, weights_only=True))
             print(f"Saved model found! Loading parameters from file: {save_path}")
-        except Exception:
+        except FileNotFoundError:
             print(f"Saved model {model.name} NOT found!")
     model.train()
     return model
@@ -115,23 +116,27 @@ def init_lazy_discriminator(discr, model, scenario, use_features):
 def pretrain_model(model, config, fabric, scenario, loss_fun, opt):
     folder_path = "save_files/" + scenario.name + "/"
     save_path = folder_path + model.name + ".pth"
-    try:
+
+    if os.path.exists(save_path):
         # Load parameters from a file
-        model.load_state_dict(torch.load(save_path, weights_only=True))
+        state = torch.load(save_path, map_location=fabric.device, weights_only=True)
+        model.load_state_dict(state)
         print(f"Saved model found! Loaded parameters from file: {save_path}")
-        model = fabric.setup(model)
-    except Exception:
-        print(f"Saved model {model.name} NOT found!")
         model, opt = fabric.setup(model, opt)
-        print(f"Pretraining {config['num_pretrain_epochs']} epochs...")
-        if config["pretrain_on_both"] is True:
-            print(
-                "========= DEBUG MODE ON: USING TARGET LABELS TO PRETRAIN LJE ORACLE MODEL ======="
-            )
-            model = utils.train_model_on_source_and_target(
-                config, model, loss_fun, scenario, opt, fabric
-            )
-        else:
-            model = utils.train_model_on_source(
-                config, model, loss_fun, scenario, opt, fabric
-            )
+        return model, opt
+    
+    print(f"Saved model {model.name} NOT found!")
+    model, opt = fabric.setup(model, opt)
+    print(f"Pretraining {config['num_pretrain_epochs']} epochs...")
+    if config["pretrain_on_both"] is True:
+        print(
+            "========= DEBUG MODE ON: USING TARGET LABELS TO PRETRAIN LJE ORACLE MODEL ======="
+        )
+        model = utils.train_model_on_source_and_target(
+            config, model, loss_fun, scenario, opt, fabric
+        )
+    else:
+        model = utils.train_model_on_source(
+            config, model, loss_fun, scenario, opt, fabric
+        )
+    return model

@@ -1,24 +1,28 @@
 def setup_cluster_config():
     config = {
+        # Debug cluster if true - all ranks will print
+        "debug_distributed": False,
+        "device": "cuda",  # 'cpu' or 'cuda', do not use auto creates problems it seems with fabric!
+        "num_devices": 4,
         # Experiment details
-        "device": "auto",  # 'cpu' or 'auto' to find gpu automatically
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        "models": ["MLP"],
+        "models": ["ResNet"],
         "resnet_size": 18,  # 18 or 50
-        "pretrain": False,
+        "pretrain": True,
         "num_pretrain_epochs": 5,  # if pretrain is True
-        "loss": "margin",  # margin, euclidean or cross-entropy
+        "loss": "cross-entropy",  # margin, euclidean or cross-entropy
         "optimizer": "adam",  # alternatives: adam, sgd
+        "adam_beta2": 0.98,
         "learning_rate": 1e-3,  # use 1e-4 for ResNets or a learning scheduler
         "momentum": 0.9,  # for SGD
         "weight_decay": 0.0,
         "num_epochs": 5,
         "num_runs": 1,
         "algs": [
-            "wrr",
+            "mmd",
         ],  # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
         # Debugging algorithms
-        "debug": True,
+        "debug": False,
         "debug_every_n": 50,
         "n_batches_per_epoch": -1,  # if -1 uses all batches
         "report_source_train_risk": False,
@@ -40,6 +44,7 @@ def setup_cluster_config():
         # Test set dataloader options
         "test_batch_size": 512,
         "shuffle": True,
+        "test_shuffle": True,
         # Dataset-specific settings
         "cifar-10-corruptions": ["fog", "frost", "snow"],
         "portraits-size": [186, 171],
@@ -63,6 +68,7 @@ def setup_cluster_config():
         "calc_weight_info": False,
         "calc_grad_info": False,
         "calc_gradual_shift": False,
+        "est_lambda": True,
     }
 
     config["scenario_options"] = scenario_config
@@ -101,7 +107,7 @@ def setup_alg_config(config):
     config["jdot"] = {
         "alpha": 0.001,
         "lambda": 0.001,
-        "track_layer": -2,
+        "track_layer": "flatten",
         "add_source_loss": True,
         "use_squared_dist": False,
     }

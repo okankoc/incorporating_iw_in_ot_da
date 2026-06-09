@@ -1,6 +1,6 @@
 from .dann import DANN as DANN
 from .erm import ERM as ERM
-from .fdal import FDAL as FDAL
+#from .fdal import FDAL as FDAL
 from .oracle import OracleLJE as OracleLJE
 from .oracle import OracleCC as OracleCC
 from .reverse_kl import ReverseKL as ReverseKL

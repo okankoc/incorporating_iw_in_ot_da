@@ -1,11 +1,12 @@
 """Script for testing unsupervised domain adaptation algorithms in several different distribution shift scenarios."""
-
+import builtins
 import argparse
 import os
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from lightning import Fabric
+from lightning.fabric.strategies import DDPStrategy
 
 # Code from this repo
 import utils
@@ -17,7 +18,6 @@ from config.local_config import setup_local_config
 from config.cluster_config import setup_cluster_config
 from load_model import load_model, init_model, pretrain_model
 from models.prob_model import ProbModel
-
 
 def reset_all(seed):
     # Python & NumPy
@@ -170,7 +170,7 @@ def setup_uda(config, fabric):
     loss_fun = init_loss(config)
     if config["pretrain"]:
         opt = init_opt(config, model)
-        pretrain_model(model, config, fabric, scenario, loss_fun, opt)
+        model = pretrain_model(model, config, fabric, scenario, loss_fun, opt)
     else:
         model = fabric.setup(model)
     results = report_init_performance(config, model, scenario, loss_fun, fabric)
@@ -315,15 +315,15 @@ def save_results(results, config):
     torch.save(data, os.path.join(folder_name, "metrics.pth"))
 
 
-def run_on_cluster():
-    config = setup_cluster_config()
-    fabric = Fabric(accelerator=config["device"], devices="auto", strategy="auto")
-    fabric.launch()
-
-    if fabric.global_rank != 0:
-        import builtins
-
-        builtins.print = lambda *args, **kwargs: None
+def run_on_cluster(fabric, config):
+    _original_print = builtins.print
+    def rank_print(*args, **kwargs):
+        kwargs.setdefault("flush", True)
+        if config["debug_distributed"]:
+            _original_print(f"[rank {fabric.global_rank}'", *args, **kwargs)
+        elif fabric.global_rank == 0:
+            _original_print(*args, **kwargs)
+    builtins.print = rank_print
 
     print(f"Fabric device: {fabric.device}")
     reset_all(seed=0)
@@ -346,8 +346,6 @@ def run_on_local():
     fabric.launch()
 
     if fabric.global_rank != 0:
-        import builtins
-
         builtins.print = lambda *args, **kwargs: None
 
     print(f"Fabric device: {fabric.device}")
@@ -359,9 +357,9 @@ def run_on_local():
 
 if __name__ == "__main__":
     torch.set_default_dtype(torch.float32)
-    # torch.set_printoptions(precision=3, sci_mode=False)
-    # torch.autograd.set_detect_anomaly(True)
-    # os.environ["TORCH_SHOW_CPP_STACKTRACES"] = "1"
+    #torch.set_printoptions(precision=3, sci_mode=False)
+    #torch.autograd.set_detect_anomaly(True)
+    #os.environ["TORCH_SHOW_CPP_STACKTRACES"] = "1"
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str)
@@ -370,6 +368,10 @@ if __name__ == "__main__":
     if args.config == "local":
         run_on_local()
     elif args.config == "cluster":
-        run_on_cluster()
+        config = setup_cluster_config()
+        fabric = Fabric(accelerator=config["device"], devices=config["num_devices"],
+                        strategy=DDPStrategy(process_group_backend="nccl",
+                                             start_method="spawn"))
+        fabric.launch(run_on_cluster, config)
     else:
         raise Exception("Unknown config, choose local or cluster")
