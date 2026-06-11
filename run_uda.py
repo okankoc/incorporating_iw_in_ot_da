@@ -12,7 +12,7 @@ from lightning.fabric.strategies import DDPStrategy
 import utils
 import adapt
 import loss
-import shifts
+from shifts.init_scenario import init as init_scenario
 from debug.debug import Debugger
 from config.local_config import setup_local_config
 from config.cluster_config import setup_cluster_config
@@ -92,7 +92,7 @@ def report_init_performance(config, model, scenario, loss_fun, fabric):
 
 
 def setup_uda(config, fabric):
-    scenario = shifts.init_scenario.init_scenario(config["scenario_options"], fabric)
+    scenario = init_scenario(config["scenario_options"], fabric)
     model = init_model(config, scenario)
     loss_fun = init_loss(config)
     if config["pretrain"]:

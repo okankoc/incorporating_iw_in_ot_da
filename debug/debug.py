@@ -188,13 +188,13 @@ def debug_model(
         model.track_features(config["est_id_at_layer"])
         model(X_source)
         feat_source = model.features
-        lpca = skdim.id.lPCA().fit_pw(feat_source, n_neighbors = 100)
+        lpca = skdim.id.lPCA().fit_pw(feat_source.cpu().detach().numpy(), n_neighbors = 100)
         std, mean = torch.std_mean(torch.tensor(lpca.dimension_pw_, dtype=torch.float32))
         metrics["id_est"]['source_mean'].append(mean.item())
         metrics["id_est"]['source_std'].append(std.item())
         model(X_target)
         feat_target = model.features
-        lpca = skdim.id.lPCA().fit_pw(feat_target, n_neighbors = 100)
+        lpca = skdim.id.lPCA().fit_pw(feat_target.cpu().detach().numpy(), n_neighbors = 100)
         std, mean = torch.std_mean(torch.tensor(lpca.dimension_pw_, dtype=torch.float32))
         metrics["id_est"]['target_mean'].append(mean.item())
         metrics["id_est"]['target_std'].append(std.item())
