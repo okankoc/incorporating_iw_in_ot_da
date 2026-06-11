@@ -1,10 +1,11 @@
 def setup_local_config():
     config = {
         # Experiment details
-        "device": "cpu",  # 'cpu' or 'auto' to find gpu automatically
+        "device": "auto",  # 'cpu' or 'auto' to find gpu automatically
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        "model": "MLP",
+        "model": "ResNet",
         "resnet_size": 18,  # 18 or 50
+        "load_imagenet_weights": True,
         "pretrain": True,
         "num_pretrain_epochs": 5,  # if pretrain is True
         "loss": "margin",  # 'margin', 'euclidean', 'cross-entropy'
@@ -14,9 +15,9 @@ def setup_local_config():
         "momentum": 0.9,  # for SGD
         "weight_decay": 0.0,
         "num_epochs": 5,
-        "num_runs": 1,
+        "num_runs": 5,
         "algs": [
-            "mmd",
+            "wrr",
         ],  # wrr, weighted_wrr, cons_wrr, jdot, lje, erm, cc, dann, fdal, reverse-kl, mmd
         # Debugging algorithms
         "debug": False,
@@ -114,11 +115,11 @@ def setup_alg_config(config):
     config["cons_wrr"] = {"norm": 2, "entropy_reg": 1e-3, "scale": 1.0, "thresh": 0.01}
 
     config["mmd"] = {
-        "alpha": 1.0,
+        "alpha": 0.1,
         "gammas": [0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0],
         "use_squared_dist": True,
-        "use_features": False, # if false uses predictions
-        "track_layer": -2, #"flatten", #"flatten" for ConvNet, -2 for MLP
+        "use_features": True, # if false uses predictions
+        "track_layer": "flatten", #"flatten" for ConvNet, -2 for MLP
     }
 
     config["dann"] = {
@@ -136,9 +137,10 @@ def setup_alg_config(config):
         "auxhead": "conv",  # conv or none
         "grl": {"max_iters": 3000, "hi": 0.6, "auto_step": True},
         "divergence": "pearson",
-        "learning_rate": 1e-3,  # for the internal optimizer
+        "learning_rate": 1e-4,  # for the internal optimizer
         "weight_decay": 0.0,
         "clip_grad_val": 10,
+        "reg_coef": 0.1,
     }
 
     config["cc"] = {

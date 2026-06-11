@@ -4,6 +4,7 @@ import ot
 import geomloss
 import numpy as np
 import matplotlib.pyplot as plt
+import skdim
 
 import utils
 from debug.gradual_shift import calc_gradual_shift
@@ -22,6 +23,7 @@ class Debugger:
             "margin": [],
             "grad": grad_dict,
             "lambda": [],
+            "id_est": {'source_mean': [], 'source_std': [], 'target_mean': [], 'target_std': []},
         }
 
     def calc_metrics(self, config, model, loss_fun, scenario, fabric):
@@ -69,6 +71,18 @@ class Debugger:
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         plt.savefig(os.path.join(folder_name, "wrr_test_vals.pdf"), format="pdf")
+
+        # Saving intrinsic dimension estimate in a separate plot
+        if config["est_id"] is True:
+            fig, ax = plt.subplots()
+            plt.title("Intrinsic dimension estimate during UDA")
+            means = self.metrics['id_est']['source_mean']
+            stds = self.metrics['id_est']['source_std']
+            ax.errorbar(x=np.arange(num_batches), y=means, yerr=stds, label="Source feat ID (LPCA)")
+            means = self.metrics['id_est']['target_mean']
+            stds = self.metrics['id_est']['target_std']
+            ax.errorbar(x=np.arange(num_batches), y=means, yerr=stds, label="Target feat ID (LPCA)")
+            plt.savefig(os.path.join(folder_name, "id_est.pdf"), format="pdf")
 
         # Saving margin and target loss in a separate plot
         if config["calc_margin"] is True:
@@ -170,6 +184,20 @@ def debug_model(
             config, model, fabric, loss_fun, pred_source, pred_target, y_source
         )
         metrics["w2r2"].append(w_wrr.item())
+    if config["est_id"] is True:
+        model.track_features(config["est_id_at_layer"])
+        model(X_source)
+        feat_source = model.features
+        lpca = skdim.id.lPCA().fit_pw(feat_source, n_neighbors = 100)
+        std, mean = torch.std_mean(torch.tensor(lpca.dimension_pw_, dtype=torch.float32))
+        metrics["id_est"]['source_mean'].append(mean.item())
+        metrics["id_est"]['source_std'].append(std.item())
+        model(X_target)
+        feat_target = model.features
+        lpca = skdim.id.lPCA().fit_pw(feat_target, n_neighbors = 100)
+        std, mean = torch.std_mean(torch.tensor(lpca.dimension_pw_, dtype=torch.float32))
+        metrics["id_est"]['target_mean'].append(mean.item())
+        metrics["id_est"]['target_std'].append(std.item())
     if config["calc_entanglement"]:
         calc_entanglement(y_source, y_target, ot_mat)
     if config["calc_margin"]:

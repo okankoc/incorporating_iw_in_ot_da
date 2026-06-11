@@ -41,7 +41,7 @@ def init_model(config, scenario):
         model = SmallCNN(num_classes=scenario.num_classes)
     elif config["model"] == "ResNet":
         model = init_resnet(
-            config["resnet_size"], scenario.num_channels, scenario.num_classes
+            config["resnet_size"], config["resnet_load_imagenet_weights"], scenario.num_channels, scenario.num_classes
         )
     else:
         raise Exception("Model not found")
@@ -50,12 +50,15 @@ def init_model(config, scenario):
     return model
 
 
-def init_resnet(size, num_inp_channels, num_classes):
+def init_resnet(size, load_imagenet_weights, num_inp_channels, num_classes):
+    weights = None
+    if load_imagenet_weights is True:
+        weights = "IMAGENET1K_V1"
     if size == 18:
-        model = torchvision.models.resnet18(weights="IMAGENET1K_V1")
+        model = torchvision.models.resnet18(weights)
         model.name = "RESNET18"
     elif size == 50:
-        model = torchvision.models.resnet50(weights="IMAGENET1K_V1")
+        model = torchvision.models.resnet50(weights)
         model.name = "RESNET50"
     else:
         raise Exception("Resnet size not allowed!")
@@ -123,8 +126,8 @@ def pretrain_model(model, config, fabric, scenario, loss_fun, opt):
         model.load_state_dict(state)
         print(f"Saved model found! Loaded parameters from file: {save_path}")
         model, opt = fabric.setup(model, opt)
-        return model, opt
-    
+        return model
+
     print(f"Saved model {model.name} NOT found!")
     model, opt = fabric.setup(model, opt)
     print(f"Pretraining {config['num_pretrain_epochs']} epochs...")

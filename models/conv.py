@@ -208,17 +208,17 @@ class SmallCNN(nn.Module):
 
 # Separated domain classifier into a new class
 class ConvDomainClassifier(nn.Module):
-    def __init__(self):
+    def __init__(self, num_classes=2):
         super().__init__()
         self.domain_classifier = nn.Sequential()
         self.domain_classifier.add_module("d_fc1", nn.LazyLinear(100))
         self.domain_classifier.add_module("d_bn1", nn.BatchNorm1d(100))
         self.domain_classifier.add_module("d_relu1", nn.ReLU(True))
-        self.domain_classifier.add_module("d_fc2", nn.Linear(100, 2))
+        self.domain_classifier.add_module("d_fc2", nn.Linear(100, num_classes))
         self.domain_classifier.add_module("d_softmax", nn.LogSoftmax(dim=1))
 
     def forward(self, input_data):
-        return self.domain_classifier(input_data)
+        return self.domain_classifier(input_data.squeeze())
 
     def copy(self, device):
         new_model = ConvDomainClassifier().to(device)

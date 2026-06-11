@@ -6,11 +6,12 @@ def setup_cluster_config():
         "num_devices": 4,
         # Experiment details
         # Model and optimizer (MLP, ConvNet, ConvNet2, LeNet, SmallCNN, ResNet)
-        "models": ["ResNet"],
+        "models": ["ConvNet"],
         "resnet_size": 18,  # 18 or 50
-        "pretrain": True,
+        "load_imagenet_weights": True,
+        "pretrain": False,
         "num_pretrain_epochs": 5,  # if pretrain is True
-        "loss": "cross-entropy",  # margin, euclidean or cross-entropy
+        "loss": "margin",  # margin, euclidean or cross-entropy
         "optimizer": "adam",  # alternatives: adam, sgd
         "adam_beta2": 0.98,
         "learning_rate": 1e-3,  # use 1e-4 for ResNets or a learning scheduler
@@ -19,10 +20,10 @@ def setup_cluster_config():
         "num_epochs": 5,
         "num_runs": 1,
         "algs": [
-            "mmd",
+            "wrr",
         ],  # wrr, weighted_wrr, cons_wrr, lje, erm, cc, dann, fdal, reverse-kl
         # Debugging algorithms
-        "debug": False,
+        "debug": True,
         "debug_every_n": 50,
         "n_batches_per_epoch": -1,  # if -1 uses all batches
         "report_source_train_risk": False,
@@ -35,7 +36,7 @@ def setup_cluster_config():
         # MNIST_TO_USPS, USPS_TO_MNIST, MNIST_TO_MNIST_M, SVHN_TO_MNIST,
         # CIFAR-10-C, PORTRAITS, OFFICEHOME, OFFICE_31, IMAGECLEFDA, VISDA17
         "scenarios": [
-            "MNIST_TO_MNIST_M",
+            "MNIST_TO_USPS",
         ],
         # Enable only when running a dataset for the first-time
         "preprocess": False,
@@ -61,14 +62,16 @@ def setup_cluster_config():
     debug_config = {
         "calc_label_shift": False,
         "calc_entanglement": False,
-        "calc_margin": True,
+        "calc_margin": False,
         "calc_wrr": True,
-        "calc_weighted_wrr": True,
+        "calc_weighted_wrr": False,
         "verbose_weighted_wrr": False,
         "calc_weight_info": False,
         "calc_grad_info": False,
         "calc_gradual_shift": False,
-        "est_lambda": True,
+        "est_lambda": False,
+        "est_id": True,
+        "est_id_at_layer": "flatten", # flatten for ConvNet, -2 for MLP, ignored for ResNet!
     }
 
     config["scenario_options"] = scenario_config

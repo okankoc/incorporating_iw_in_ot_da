@@ -10,12 +10,14 @@ class FDAL:
         self.name = "FDAL"
         print(f"Initializing {self.name}")
         juncture = config["juncture"]
+        if 'RESNET' in model.name:
+            model.net = torch.nn.Sequential(*list(model.children()))
         backbone = model.net[:juncture]
         taskhead = model.net[juncture:]
         if config["auxhead"] == "none":
             aux_head = None
         elif config["auxhead"] == "conv":
-            aux_head = ConvDomainClassifier()
+            aux_head = ConvDomainClassifier(model.num_classes)
             aux_head = init_lazy_discriminator(
                 aux_head, backbone, scenario, use_features=False
             )
@@ -27,6 +29,7 @@ class FDAL:
             taskhead,
             loss_fun,
             divergence=config["divergence"],
+            reg_coef=config["reg_coef"],
             n_classes=model.num_classes,
             aux_head=aux_head,
             grl_params=config["grl"],
